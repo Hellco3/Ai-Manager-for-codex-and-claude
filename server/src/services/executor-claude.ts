@@ -2,9 +2,6 @@ import Anthropic from '@anthropic-ai/sdk';
 import { type Subtask } from '@ai_manager/shared';
 import { config } from '../config.js';
 import { logger } from '../utils/logger.js';
-import { isRetryableError } from '../utils/retry.js';
-
-const anthropic = new Anthropic({ apiKey: config.ANTHROPIC_API_KEY });
 
 const SYSTEM_PROMPTS: Record<string, string> = {
   analysis: `You are an expert analyst. Analyze the given task thoroughly and provide clear, actionable insights. Be structured and concise.`,
@@ -21,8 +18,8 @@ export interface ClaudeExecutionResult {
 }
 
 /**
- * Execute an analysis/design/research/integration subtask via Claude API with streaming.
- * Supports abort signal for cancellation and returns token usage for cost tracking.
+ * Execute an analysis/design/research/integration subtask via Claude API.
+ * Uses CCSwitch proxy at ANTHROPIC_BASE_URL — same as Claude Code.
  */
 export async function executeSubtask(
   subtask: Subtask,
@@ -37,7 +34,6 @@ export async function executeSubtask(
   for (const depId of subtask.dependencies) {
     const depResult = dependencyResults.get(depId);
     if (depResult) {
-      // Truncate each dependency result to max 4000 chars
       const truncated = depResult.length > 4000
         ? depResult.slice(0, 4000) + '\n... (truncated)'
         : depResult;
@@ -46,22 +42,21 @@ export async function executeSubtask(
   }
 
   const startedAt = Date.now();
-  logger.info({ subtaskId: subtask.id, kind: subtask.kind, deps: subtask.dependencies.length }, 'Executing Claude subtask');
+  logger.info({ subtaskId: subtask.id, kind: subtask.kind, baseUrl: config.ANTHROPIC_BASE_URL }, 'Executing subtask via CCSwitch');
 
   // Check abort before starting
   if (signal.aborted) {
     throw new DOMException('Subtask cancelled before start', 'AbortError');
   }
 
-  const abortHandler = () => {
-    stream.controller.abort();
-  };
-  signal.addEventListener('abort', abortHandler, { once: true });
+  const anthropic = new Anthropic({
+    apiKey: config.ANTHROPIC_API_KEY,
+    baseURL: config.ANTHROPIC_BASE_URL,
+  });
 
   const stream = anthropic.messages.stream({
     model: config.EXECUTOR_MODEL,
     max_tokens: 16000,
-    thinking: { type: 'enabled', budget_tokens: 2000 },
     system: systemPrompt,
     messages: [{
       role: 'user',
@@ -76,25 +71,20 @@ export async function executeSubtask(
 
   let fullText = '';
 
-  try {
-    for await (const event of stream) {
-      if (signal.aborted) {
-        stream.controller.abort();
-        throw new DOMException('Subtask cancelled', 'AbortError');
-      }
-      if (event.type === 'content_block_delta' && event.delta.type === 'text_delta') {
-        const text = (event.delta as any).text as string;
-        fullText += text;
-        onProgress(text);
-      }
+  for await (const event of stream) {
+    if (signal.aborted) {
+      stream.controller.abort();
+      throw new DOMException('Subtask cancelled', 'AbortError');
     }
-  } finally {
-    signal.removeEventListener('abort', abortHandler);
+    if (event.type === 'content_block_delta' && event.delta.type === 'text_delta') {
+      const text = (event.delta as any).text as string;
+      fullText += text;
+      onProgress(text);
+    }
   }
 
   const finalMessage = await stream.finalMessage();
   const durationMs = Date.now() - startedAt;
-
   const inputTokens = finalMessage.usage?.input_tokens ?? 0;
   const outputTokens = finalMessage.usage?.output_tokens ?? 0;
 
@@ -104,7 +94,7 @@ export async function executeSubtask(
     inputTokens,
     outputTokens,
     durationMs,
-  }, 'Claude subtask completed');
+  }, 'Subtask completed via CCSwitch');
 
   return { text: fullText, inputTokens, outputTokens, durationMs };
 }

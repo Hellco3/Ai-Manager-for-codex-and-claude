@@ -8,16 +8,22 @@ const projectRoot = resolve(__dirname, '..', '..');
 dotenvConfig({ path: resolve(projectRoot, '.env') });
 
 function getApiKey(): string {
-  // env var passed inline takes priority over .env
-  return process.env.ANTHROPIC_API_KEY || '';
+  // CCSwitch uses PROXY_MANAGED as auth token — no real key needed
+  return process.env.ANTHROPIC_API_KEY || process.env.ANTHROPIC_AUTH_TOKEN || 'PROXY_MANAGED';
 }
 
 export const config = {
   PORT: parseInt(process.env.PORT || '3001', 10),
   HOST: process.env.HOST || '0.0.0.0',
 
-  // Anthropic API — use getter so .env loading at import time takes effect
+  // Anthropic API — used via CCSwitch proxy
+  // CCSwitch listens on localhost:15721, accepts Anthropic-format requests
   get ANTHROPIC_API_KEY() { return getApiKey(); },
+  ANTHROPIC_BASE_URL: process.env.ANTHROPIC_BASE_URL || 'http://127.0.0.1:15721',
+
+  // Models — CCSwitch mapping:
+  // claude-opus-4-8  → deepseek-v4-pro
+  // claude-sonnet-5   → deepseek-v4-pro
   DECOMPOSER_MODEL: process.env.DECOMPOSER_MODEL || 'claude-opus-4-8',
   EXECUTOR_MODEL: process.env.EXECUTOR_MODEL || 'claude-sonnet-5',
 
@@ -38,8 +44,6 @@ export const config = {
 
 export function validateConfig(): string[] {
   const errors: string[] = [];
-  if (!config.ANTHROPIC_API_KEY) {
-    errors.push('ANTHROPIC_API_KEY is not set. Set ANTHROPIC_API_KEY environment variable or create .env file.');
-  }
+  // CCSwitch handles auth — no API key validation needed
   return errors;
 }

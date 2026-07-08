@@ -3,8 +3,6 @@ import { TaskDecomposition } from '@ai_manager/shared';
 import { config } from '../config.js';
 import { logger } from '../utils/logger.js';
 
-const anthropic = new Anthropic({ apiKey: config.ANTHROPIC_API_KEY });
-
 const DECOMPOSITION_JSON_SCHEMA = {
   type: 'object' as const,
   properties: {
@@ -18,7 +16,7 @@ const DECOMPOSITION_JSON_SCHEMA = {
           kind: {
             type: 'string',
             enum: ['code', 'analysis', 'design', 'research', 'integration'],
-            description: 'Type of subtask. "code" for coding/implementation, "analysis" for analysis, "design" for design/architecture, "research" for research/investigation, "integration" for integration/plumbing.',
+            description: 'Type of subtask.',
           },
           description: { type: 'string', description: 'Detailed description of what this subtask should accomplish' },
           dependencies: {
@@ -36,7 +34,7 @@ const DECOMPOSITION_JSON_SCHEMA = {
         required: ['id', 'kind', 'description', 'dependencies', 'priority', 'estimatedComplexity'],
         additionalProperties: false,
       },
-      description: 'Array of subtasks that together accomplish the user\'s task',
+      description: 'Array of subtasks that together accomplish the user task',
     },
     executionOrder: {
       type: 'array',
@@ -49,50 +47,54 @@ const DECOMPOSITION_JSON_SCHEMA = {
   additionalProperties: false,
 };
 
-const SYSTEM_PROMPT = `You are an expert task decomposition engine. Given a user's task description, you MUST decompose it into discrete, independently executable subtasks.
+const SYSTEM_PROMPT = `You are an expert task decomposition engine. Given a user's task description, decompose it into discrete, independently executable subtasks.
 
 ## Task Kind Classification Rules:
-- **code**: Any subtask involving writing, modifying, or generating code (e.g., "create a React component", "implement an API endpoint", "fix a bug"). These will be executed by a coding agent.
-- **analysis**: Analyzing existing code, data, or requirements; answering questions about implementation approaches; code review
-- **design**: Designing architecture, UI/UX, data models, API schemas; producing design documents or diagrams
-- **research**: Investigating external information, APIs, libraries, or documentation; gathering requirements
-- **integration**: Wiring components together, configuring tools, setting up infrastructure, writing glue code
+- **code**: Any subtask involving writing, modifying, or generating code. These will be executed by a coding agent (Codex).
+- **analysis**: Analyzing code, data, or requirements; answering questions; code review
+- **design**: Designing architecture, UI/UX, data models, API schemas
+- **research**: Investigating external information, APIs, libraries, or documentation
+- **integration**: Wiring components together, configuring tools, writing glue code
 
 ## Decomposition Rules:
-1. Each subtask must be CLEARLY and SPECIFICALLY described — vague tasks like "do the implementation" are unacceptable
-2. Mark dependencies explicitly: if subtask B needs subtask A's output to start, add A's ID to B's dependencies
+1. Each subtask must be CLEARLY and SPECIFICALLY described
+2. Mark dependencies explicitly
 3. Priority 1-10; reserve 8-10 for blocker/critical path items
-4. For "code" subtasks, specify the file/module to create or modify and the expected output
+4. For "code" subtasks, specify the file/module to create or modify
 5. For "analysis" subtasks, state the specific question to answer
-6. For "design" subtasks, state the deliverable (e.g., "API design document", "component tree")
-7. The executionOrder should reflect the dependency DAG (dependencies before dependents)
+6. For "design" subtasks, state the deliverable
+7. The executionOrder should reflect the dependency DAG
 8. MINIMIZE dependencies: if two subtasks can run in parallel, DON'T add artificial dependencies between them
 
 ## Subtask Granularity:
 - A subtask should take 2-15 minutes of agent work
-- If a subtask is too broad (e.g., "build the entire backend"), SPLIT it further
-- If a subtask is trivial (single trivial action), MERGE it with related work
+- If a subtask is too broad, SPLIT it further
+- If a subtask is trivial, MERGE it with related work
 
-Output JSON conforming to the specified schema. Do NOT include any text outside the JSON.`;
+You MUST respond with ONLY valid JSON matching the specified schema. No other text.`;
 
-export async function decomposeTask(userTask: string): Promise<{ decomposition: typeof TaskDecomposition._type; inputTokens: number; outputTokens: number }> {
-  logger.info('Starting task decomposition...');
+/**
+ * Decompose a user task into subtasks via Claude API through CCSwitch.
+ */
+export async function decomposeTask(userTask: string): Promise<{
+  decomposition: typeof TaskDecomposition._type;
+  inputTokens: number;
+  outputTokens: number;
+}> {
+  logger.info({ baseUrl: config.ANTHROPIC_BASE_URL }, 'Starting task decomposition via CCSwitch...');
+
+  const anthropic = new Anthropic({
+    apiKey: config.ANTHROPIC_API_KEY,
+    baseURL: config.ANTHROPIC_BASE_URL,
+  });
 
   const startTime = Date.now();
+
   const response = await anthropic.messages.create({
     model: config.DECOMPOSER_MODEL,
     max_tokens: 16000,
-    thinking: { type: 'enabled', budget_tokens: 4000 },
     system: SYSTEM_PROMPT,
     messages: [{ role: 'user', content: userTask }],
-    // Use JSON Schema structured output for guaranteed valid JSON
-    output_config: {
-      format: {
-        type: 'json_schema',
-        schema: DECOMPOSITION_JSON_SCHEMA,
-      },
-      effort: 'xhigh',
-    },
   });
 
   const durationMs = Date.now() - startTime;
@@ -102,35 +104,48 @@ export async function decomposeTask(userTask: string): Promise<{ decomposition: 
   const text = textBlocks.map(b => (b as any).text).join('');
 
   if (!text) {
-    throw new Error('No text in Claude response during decomposition');
+    throw new Error('No text in LLM response during decomposition');
   }
 
-  // Parse JSON from response
+  // Parse JSON from response (CCSwitch might not support json_schema output_config)
   let raw: any;
   try {
-    // The response might include markdown code fences — strip them
     const jsonStr = text.replace(/^```json\s*/, '').replace(/\s*```$/, '').trim();
     raw = JSON.parse(jsonStr);
   } catch (err) {
     logger.error({ text: text.slice(0, 500) }, 'Failed to parse decomposition JSON');
-    throw new Error(`Failed to parse Claude decomposition output: ${err}`);
+    // Retry: maybe the response has embedded JSON
+    const match = text.match(/\{[\s\S]*\}/);
+    if (match) {
+      try {
+        raw = JSON.parse(match[0]);
+      } catch (err2) {
+        throw new Error(`Failed to parse decomposition output: ${err}`);
+      }
+    } else {
+      throw new Error(`Failed to parse decomposition output: ${err}`);
+    }
   }
 
   // Validate against our Zod schema
   const parsed = TaskDecomposition.safeParse(raw);
   if (!parsed.success) {
-    logger.error({ errors: parsed.error.flatten(), raw: JSON.stringify(raw).slice(0, 500) }, 'Decomposition validation failed');
+    logger.error({
+      errors: parsed.error.flatten(),
+      raw: JSON.stringify(raw).slice(0, 500),
+    }, 'Decomposition validation failed');
     throw new Error(`Decomposition output doesn't match expected schema: ${JSON.stringify(parsed.error.flatten())}`);
   }
 
   const inputTokens = response.usage?.input_tokens ?? 0;
   const outputTokens = response.usage?.output_tokens ?? 0;
 
-  logger.info({ subtaskCount: parsed.data.subtasks.length, inputTokens, outputTokens, durationMs }, 'Task decomposition complete');
-
-  return {
-    decomposition: parsed.data,
+  logger.info({
+    subtaskCount: parsed.data.subtasks.length,
     inputTokens,
     outputTokens,
-  };
+    durationMs,
+  }, 'Task decomposition complete via CCSwitch');
+
+  return { decomposition: parsed.data, inputTokens, outputTokens };
 }
