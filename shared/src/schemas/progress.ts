@@ -63,6 +63,11 @@ export const SessionState = z.object({
   mode: z.enum(['auto', 'semi-auto']),
   decomposition: TaskDecomposition.optional(),
   subtaskStates: z.record(z.string(), SubtaskState).default({}),
+  messages: z.array(z.object({
+    role: z.string(),
+    content: z.string(),
+    timestamp: z.number(),
+  })).optional(),
   costStats: z.array(CostStats).default([]),
   createdAt: z.number(),
   updatedAt: z.number(),

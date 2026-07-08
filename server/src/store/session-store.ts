@@ -18,6 +18,7 @@ interface StoredSession {
   mode: 'auto' | 'semi-auto';
   decomposition: any;
   subtaskStates: Record<string, SubtaskState>;
+  messages?: Array<{ role: string; content: string; timestamp: number }>;
   costStats: CostStats[];
   createdAt: number;
   updatedAt: number;

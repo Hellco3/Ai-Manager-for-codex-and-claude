@@ -122,6 +122,50 @@ router.post('/tasks/:id/cancel', async (req: Request, res: Response) => {
 });
 
 // GET /api/sessions/:id/stream
+// POST /api/sessions/:id/message — send follow-up message within a session
+router.post('/sessions/:id/message', async (req: Request, res: Response) => {
+  const id = param(req, 'id');
+  const session = sessionStore.get(id);
+  if (!session) {
+    res.status(404).json({ error: 'Session not found' });
+    return;
+  }
+  const { message } = req.body;
+  if (!message || typeof message !== 'string') {
+    res.status(400).json({ error: 'message is required' });
+    return;
+  }
+
+  // Append to session message history
+  if (!session.messages) session.messages = [];
+  session.messages.push({ role: 'user', content: message, timestamp: Date.now() });
+
+  // Re-run orchestrator with the new message as context
+  const { orchestrator } = await import('../services/orchestrator.js');
+  orchestrator.continueSession(id, message).catch(err => {
+    logger.error({ sessionId: id, error: err }, 'Continue session failed');
+  });
+
+  res.json({ accepted: true });
+});
+
+// POST /api/sessions/:id/reconstruct — re-decompose remaining work
+router.post('/sessions/:id/reconstruct', async (req: Request, res: Response) => {
+  const id = param(req, 'id');
+  const session = sessionStore.get(id);
+  if (!session) {
+    res.status(404).json({ error: 'Session not found' });
+    return;
+  }
+
+  const { orchestrator } = await import('../services/orchestrator.js');
+  orchestrator.reconstructSession(id).catch(err => {
+    logger.error({ sessionId: id, error: err }, 'Reconstruct session failed');
+  });
+
+  res.json({ accepted: true });
+});
+
 router.get('/sessions/:id/stream', (req: Request, res: Response) => {
   const sessionId = param(req, 'id');
   const session = sessionStore.get(sessionId);

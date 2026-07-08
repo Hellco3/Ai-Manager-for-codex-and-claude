@@ -296,9 +296,102 @@ class Orchestrator {
       controller.abort();
       this.activeRuns.delete(sessionId);
     }
-    // Clean up Codex CLI processes via AbortSignal
-    // The runExecuteStage checks signal.aborted and kills spawned processes
     logger.info({ sessionId }, 'Session cancelled - orchestrator aborting');
+  }
+
+  /** Continue a session with a follow-up message */
+  async continueSession(sessionId: string, message: string): Promise<void> {
+    const session = sessionStore.get(sessionId);
+    if (!session) return;
+
+    const abortController = new AbortController();
+    this.activeRuns.set(sessionId, abortController);
+    const costTracker = this.costTrackers.get(sessionId) ?? new CostTracker();
+    this.costTrackers.set(sessionId, costTracker);
+
+    // Broadcast conversation message to SSE
+    sseManager.broadcast(sessionId, {
+      type: 'subtask:progress',
+      subtaskId: 'conversation',
+      chunk: `[用户] ${message}\n`,
+    });
+
+    // Re-decompose with conversation context
+    try {
+      sessionStore.updateStatus(sessionId, 'decomposing');
+      const { decomposeTask } = await import('./decomposer.js');
+
+      // Build context from previous messages
+      let contextTask = session.task;
+      if (session.messages && session.messages.length > 0) {
+        const history = session.messages.map(m => `${m.role}: ${m.content}`).join('\n');
+        contextTask = `Original task: ${session.task}\n\nConversation history:\n${history}\n\nLatest request: ${message}`;
+      } else {
+        contextTask = `Original task: ${session.task}\n\nFollow-up request: ${message}`;
+      }
+
+      const { decomposition, inputTokens, outputTokens } = await decomposeTask(contextTask);
+      sessionStore.setDecomposition(sessionId, decomposition);
+
+      const stats = costTracker.addEntry(config.DECOMPOSER_MODEL, inputTokens, outputTokens, 0);
+      sseManager.broadcast(sessionId, { type: 'cost:update', stats });
+
+      // Execute new decomposition
+      await this.runExecuteStage(sessionId, costTracker, abortController.signal);
+      await this.runAggregateStage(sessionId, costTracker);
+      this.completeSession(sessionId, costTracker);
+    } catch (error: any) {
+      if (error.name === 'AbortError') return;
+      logger.error({ sessionId, error }, 'Continue session failed');
+      sessionStore.updateStatus(sessionId, 'failed');
+      sseManager.broadcast(sessionId, { type: 'session:error', error: error.message || 'Unknown error' });
+    }
+  }
+
+  /** Re-decompose remaining work in a session */
+  async reconstructSession(sessionId: string): Promise<void> {
+    const session = sessionStore.get(sessionId);
+    if (!session) return;
+
+    const abortController = new AbortController();
+    this.activeRuns.set(sessionId, abortController);
+    const costTracker = this.costTrackers.get(sessionId) ?? new CostTracker();
+    this.costTrackers.set(sessionId, costTracker);
+
+    try {
+      sessionStore.updateStatus(sessionId, 'decomposing');
+
+      // Build context from completed subtasks and messages
+      const completedResults: string[] = [];
+      for (const [id, state] of Object.entries(session.subtaskStates ?? {})) {
+        if (state.status === 'completed' && state.result) {
+          completedResults.push(`[${id}] ${state.subtask.description}: ${state.result.slice(0, 500)}`);
+        }
+      }
+
+      let contextTask = session.task;
+      if (session.messages && session.messages.length > 0) {
+        contextTask += '\n\nConversation:\n' + session.messages.map(m => `${m.role}: ${m.content}`).join('\n');
+      }
+      if (completedResults.length > 0) {
+        contextTask += '\n\nCompleted work:\n' + completedResults.join('\n');
+      }
+      contextTask += '\n\nReconstruct and continue remaining work.';
+
+      const { decomposeTask } = await import('./decomposer.js');
+      const { decomposition, inputTokens, outputTokens } = await decomposeTask(contextTask);
+      sessionStore.setDecomposition(sessionId, decomposition);
+
+      const stats = costTracker.addEntry(config.DECOMPOSER_MODEL, inputTokens, outputTokens, 0);
+      sseManager.broadcast(sessionId, { type: 'cost:update', stats });
+
+      await this.runExecuteStage(sessionId, costTracker, abortController.signal);
+      await this.runAggregateStage(sessionId, costTracker);
+      this.completeSession(sessionId, costTracker);
+    } catch (error: any) {
+      if (error.name === 'AbortError') return;
+      logger.error({ sessionId, error }, 'Reconstruct session failed');
+    }
   }
 
   private broadcastStage(sessionId: string, type: 'stage:started' | 'stage:completed', stage: string): void {
