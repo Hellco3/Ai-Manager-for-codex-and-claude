@@ -38,7 +38,7 @@ interface PipelineStore {
   streamingContent: string;
 
   applySSEEvent: (event: SSEEvent) => void;
-  hydrateFromSession: (session: any) => void;
+  hydrateFromSession: (session: SessionState) => void;
   initStages: () => void;
   reset: () => void;
 
@@ -47,6 +47,7 @@ interface PipelineStore {
   removeLastUserMessage: () => void;
   appendStreamingChunk: (chunk: string) => void;
   commitStreamingMessage: (role: string, timestamp: number) => void;
+  clearStreamingState: () => void;
 }
 
 const DEFAULT_STAGES: Record<string, StageEntry> = {
@@ -542,4 +543,6 @@ export const usePipelineStore = create<PipelineStore>((set, get) => ({
       }],
     };
   }),
+
+  clearStreamingState: () => set({ isStreaming: false, streamingContent: '' }),
 }));

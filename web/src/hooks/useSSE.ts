@@ -9,6 +9,7 @@ import type { SSEEvent } from '@ai_manager/shared';
  */
 export function useSSE(sessionId: string | null, enabled = true) {
   const applySSEEvent = usePipelineStore((s) => s.applySSEEvent);
+  const clearStreamingState = usePipelineStore((s) => s.clearStreamingState);
   const eventSourceRef = useRef<EventSource | null>(null);
   const reconnectTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const reconnectCountRef = useRef(0);
@@ -53,6 +54,9 @@ export function useSSE(sessionId: string | null, enabled = true) {
         if (isClosedRef.current || eventSourceRef.current !== es) {
           return;
         }
+
+        // Clear streaming state on disconnect to avoid stale partial content
+        clearStreamingState();
 
         // On error, close and reconnect
         es.close();
