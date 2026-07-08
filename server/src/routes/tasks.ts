@@ -148,6 +148,7 @@ router.post('/sessions/:id/message', async (req: Request, res: Response) => {
   // to avoid double-storing the message.
 
   // Re-run orchestrator with the new message as context
+  // Import first, then call synchronously to avoid TOCTOU race
   const { orchestrator } = await import('../services/orchestrator.js');
   orchestrator.continueSession(id, message.trim()).catch(err => {
     logger.error({ sessionId: id, error: err }, 'Continue session failed');

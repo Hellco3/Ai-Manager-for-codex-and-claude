@@ -369,6 +369,8 @@ class Orchestrator {
       logger.error({ sessionId, error }, 'Continue session failed');
       sessionStore.updateStatus(sessionId, 'failed');
       sseManager.broadcast(sessionId, { type: 'session:error', error: error.message || 'Unknown error' });
+      // Clean up bookkeeping so stale entries don't leak
+      this.activeRuns.delete(sessionId);
     }
   }
 
@@ -442,14 +444,17 @@ CRITICAL: Keep responses brief (2-4 sentences). The system handles execution —
     } catch (error: any) {
       if (error.name === 'AbortError') throw error;
       logger.error({ sessionId, error }, 'Chat response streaming failed');
-      // Non-fatal: continue with re-decomposition even if chat response fails
+      // Non-fatal: broadcast the real error to chat and continue with re-decomposition
+      const errorMessage = error?.status === 401
+        ? 'Authentication error with AI service. Please check configuration.'
+        : `Chat response unavailable (${error.message || 'unknown error'}). Proceeding with task re-decomposition.`;
       sseManager.broadcast(sessionId, {
         type: 'message:complete',
-        content: `I'll help you with that. Let me re-analyze the task.`,
-        role: 'assistant',
+        content: errorMessage,
+        role: 'system',
         timestamp: Date.now(),
       });
-      sessionStore.addMessage(sessionId, 'assistant', `I'll help you with that. Let me re-analyze the task.`);
+      sessionStore.addMessage(sessionId, 'system', errorMessage);
     }
   }
 
@@ -500,6 +505,7 @@ CRITICAL: Keep responses brief (2-4 sentences). The system handles execution —
       logger.error({ sessionId, error }, 'Reconstruct session failed');
       sessionStore.updateStatus(sessionId, 'failed');
       sseManager.broadcast(sessionId, { type: 'session:error', error: error.message || 'Unknown error' });
+      this.activeRuns.delete(sessionId);
     }
   }
 
