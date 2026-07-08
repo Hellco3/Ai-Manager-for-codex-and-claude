@@ -7,3 +7,4 @@ web/dist/
 server/dist/
 server/dist/
 server/dist/
+web/tsconfig.tsbuildinfo
