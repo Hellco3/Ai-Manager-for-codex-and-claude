@@ -1,7 +1,5 @@
 import {
   type Subtask,
-  type SubtaskKind,
-  SubtaskComplexity,
 } from '@ai_manager/shared';
 
 /**
@@ -88,7 +86,6 @@ export function selectExecutor(subtask: Subtask): 'claude' | 'codex' {
     case 'integration':
       return 'claude';
     default:
-      // Default to Claude for unknown kinds
       return 'claude';
   }
 }
@@ -102,6 +99,29 @@ export function isRetryableError(error: unknown): boolean {
   if (msg.includes('timeout') || msg.includes('etimedout')) return true;
   if (msg.includes('econnrefused') || msg.includes('econnreset')) return true;
   if (msg.includes('internal server error') || msg.includes('500')) return true;
-  if (msg.includes('503') || msg.includes('502')) return true;
+  if (msg.includes('503') || msg.includes('502') || msg.includes('overloaded')) return true;
   return false;
+}
+
+/** Dead-letter queue for failed subtasks */
+export class DeadLetterQueue {
+  private failed: Array<{ subtask: Subtask; error: string; timestamp: number }> = [];
+
+  record(subtask: Subtask, error: string): void {
+    this.failed.push({ subtask, error, timestamp: Date.now() });
+    // Keep max 100 entries
+    if (this.failed.length > 100) this.failed.shift();
+  }
+
+  getAll() {
+    return [...this.failed];
+  }
+
+  getCount(): number {
+    return this.failed.length;
+  }
+
+  clear(): void {
+    this.failed = [];
+  }
 }

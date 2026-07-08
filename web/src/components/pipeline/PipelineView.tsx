@@ -1,4 +1,5 @@
 import React from 'react';
+import { motion } from 'framer-motion';
 import type { SubtaskState } from '@ai_manager/shared';
 import SwimLaneView from './SwimLaneView.js';
 
@@ -40,11 +41,16 @@ export default function PipelineView({
 
             return (
               <React.Fragment key={key}>
-                <div className="flex flex-col items-center gap-2">
+                <motion.div
+                  className="flex flex-col items-center gap-2"
+                  initial={{ opacity: 0.5 }}
+                  animate={{ opacity: 1, scale: isActive ? 1.05 : 1 }}
+                  transition={{ duration: 0.3 }}
+                >
                   <div
                     className={`
                       relative flex h-14 w-14 items-center justify-center rounded-xl text-xl transition-all duration-500
-                      ${isActive ? 'stage-card active scale-110 shadow-lg shadow-blue-500/20' : ''}
+                      ${isActive ? 'stage-card active shadow-lg shadow-blue-500/20' : ''}
                       ${isComplete ? 'border-green-500/30 bg-green-500/10' : ''}
                       ${isFailed ? 'border-red-500/30 bg-red-500/10' : ''}
                       ${stage?.status === 'running' ? 'border-blue-500/30 bg-blue-500/10' : ''}
@@ -95,7 +101,7 @@ export default function PipelineView({
                       'bg-slate-700'
                     }`}
                   />
-                </div>
+                </motion.div>
 
                 {idx < stageOrder.length - 1 && (
                   <div className="mx-2 mb-8 flex-1">

@@ -9,7 +9,10 @@
   "scripts": {
     "dev": "concurrently \"npm run dev -w server\" \"npm run dev -w web\"",
     "dev:server": "npm run dev -w server",
-    "dev:web": "npm run dev -w web"
+    "dev:web": "npm run dev -w web",
+    "test": "npx vitest run --config server/vitest.config.ts && npx vitest run --config web/vite.config.ts",
+    "test:server": "npx vitest run --config server/vitest.config.ts",
+    "test:web": "npx vitest run --config web/vite.config.ts"
   },
   "devDependencies": {
     "concurrently": "^9.1.0",
