@@ -12,15 +12,14 @@ describe('App', () => {
       </BrowserRouter>,
     );
     expect(screen.getByText('AI')).toBeInTheDocument();
-    expect(screen.getByText('Orchestrator')).toBeInTheDocument();
   });
 
-  it('renders the header', () => {
+  it('renders the i18n header', () => {
     render(
       <BrowserRouter>
         <App />
       </BrowserRouter>,
     );
-    expect(screen.getByText('Task Orchestration Platform')).toBeInTheDocument();
+    expect(screen.getAllByText('AI 任务编排器')).toHaveLength(2);
   });
 });

@@ -2,11 +2,11 @@ import React from 'react';
 import { Routes, Route } from 'react-router-dom';
 import TaskSubmit from './pages/TaskSubmit.js';
 import TaskProgress from './pages/TaskProgress.js';
+import { t } from './i18n.js';
 
 export default function App() {
   return (
     <div className="min-h-screen bg-grid">
-      {/* Header */}
       <header className="border-b border-slate-700/50 bg-slate-900/50 backdrop-blur-sm sticky top-0 z-50">
         <div className="max-w-7xl mx-auto px-6 py-4 flex items-center justify-between">
           <div className="flex items-center gap-3">
@@ -17,10 +17,10 @@ export default function App() {
             </div>
             <h1 className="text-lg font-semibold">
               <span className="text-white">AI</span>{' '}
-              <span className="gradient-text">Orchestrator</span>
+              <span className="gradient-text">{t.app.title}</span>
             </h1>
           </div>
-          <span className="text-xs text-slate-500">Task Orchestration Platform</span>
+          <span className="text-xs text-slate-500">{t.app.subtitle}</span>
         </div>
       </header>
 

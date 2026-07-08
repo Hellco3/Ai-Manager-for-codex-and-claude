@@ -4,6 +4,7 @@ import { useSSE } from '../hooks/useSSE.js';
 import { usePipelineStore } from '../store/pipeline-store.js';
 import { useSessionStore } from '../store/session-store.js';
 import { cancelTask, getTask } from '../api/client.js';
+import { t } from '../i18n.js';
 import PipelineView from '../components/pipeline/PipelineView.js';
 import SubtaskList from '../components/pipeline/SubtaskList.js';
 import DecompositionReview from '../components/task/DecompositionReview.js';
@@ -74,7 +75,7 @@ export default function TaskProgress() {
 
   const openLog = (subtaskId: string) => { setLogSubtaskId(subtaskId); setLogOpen(true); };
 
-  const stageLabels: Record<string, string> = { decompose: 'Decompose', review: 'Review', execute: 'Execute', aggregate: 'Aggregate' };
+  const stageLabels = t.stages;
   const stageIcons: Record<string, string> = { decompose: '🔍', review: '👁️', execute: '⚡', aggregate: '📋' };
 
   const logSubtask = logSubtaskId ? subtasks[logSubtaskId] : null;
@@ -86,20 +87,20 @@ export default function TaskProgress() {
         <div>
           <button onClick={handleNewTask} className="text-sm text-slate-500 hover:text-slate-300 inline-flex items-center gap-1 mb-2">
             <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" /></svg>
-            New Task
+            {t.progress.newTask}
           </button>
-          <h2 className="text-2xl font-bold text-white">Task Progress</h2>
+          <h2 className="text-2xl font-bold text-white">{t.progress.title}</h2>
           {elapsed && <span className="text-xs text-slate-600 font-mono ml-2">{elapsed}</span>}
         </div>
         <div className="flex items-center gap-4">
           {costStats.length > 0 && (
             <div className="text-right">
-              <div className="text-xs text-slate-500">Cost</div>
+              <div className="text-xs text-slate-500">{t.progress.cost}</div>
               <div className="text-sm font-mono text-green-400">${totalCost.toFixed(4)}</div>
             </div>
           )}
           {!isComplete && !isError && (
-            <button onClick={handleCancel} className="px-4 py-2 rounded-lg bg-red-500/10 border border-red-500/20 text-red-400 text-sm hover:bg-red-500/20">Cancel</button>
+            <button onClick={handleCancel} className="px-4 py-2 rounded-lg bg-red-500/10 border border-red-500/20 text-red-400 text-sm hover:bg-red-500/20">{t.progress.cancel}</button>
           )}
         </div>
       </div>
@@ -115,7 +116,7 @@ export default function TaskProgress() {
       {/* Error */}
       {isError && (
         <div className="mt-6 p-4 rounded-xl bg-red-500/10 border border-red-500/20 text-red-400">
-          <div className="flex items-center gap-2 mb-1"><span className="font-medium">Execution Failed</span></div>
+          <div className="flex items-center gap-2 mb-1"><span className="font-medium">{t.error.failed}</span></div>
           {errorMessage}
         </div>
       )}
@@ -123,9 +124,9 @@ export default function TaskProgress() {
       {/* Complete */}
       {isComplete && (
         <div className="mt-6 p-4 rounded-xl bg-green-500/10 border border-green-500/20">
-          <div className="flex items-center gap-2 text-green-400 mb-2"><span className="font-medium">Task Completed</span></div>
-          <p className="text-sm text-slate-400">All subtasks executed. Total cost: ${totalCost.toFixed(4)}.</p>
-          <button onClick={handleNewTask} className="mt-3 px-4 py-2 rounded-lg bg-blue-500/20 text-blue-400 text-sm hover:bg-blue-500/30">Start New Task</button>
+          <div className="flex items-center gap-2 text-green-400 mb-2"><span className="font-medium">{t.status.completed}</span></div>
+          <p className="text-sm text-slate-400">{t.error.allDone}. {t.progress.cost}: ${totalCost.toFixed(4)}.</p>
+          <button onClick={handleNewTask} className="mt-3 px-4 py-2 rounded-lg bg-blue-500/20 text-blue-400 text-sm hover:bg-blue-500/30">{t.progress.startNew}</button>
         </div>
       )}
 
@@ -138,7 +139,7 @@ export default function TaskProgress() {
       {/* Subtasks */}
       {Object.keys(subtasks).length > 0 && (
         <div className="mt-8">
-          <h3 className="text-lg font-semibold text-white mb-4">Subtasks</h3>
+          <h3 className="text-lg font-semibold text-white mb-4">{t.subtask.title}</h3>
           <SubtaskList subtasks={subtasks} onOpenLog={openLog} />
         </div>
       )}
@@ -151,7 +152,7 @@ export default function TaskProgress() {
             {logSubtask.progressChunks.length > 0 ? (
               <pre className="text-xs text-slate-400 whitespace-pre-wrap font-mono">{logSubtask.progressChunks.join('')}</pre>
             ) : (
-              <p className="text-xs text-slate-600">No output yet</p>
+              <p className="text-xs text-slate-600">{t.subtask.noOutput}</p>
             )}
           </div>
         )}
