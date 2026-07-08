@@ -65,6 +65,7 @@ router.get('/tasks/:id', (req: Request, res: Response) => {
     task: session.task,
     decomposition: session.decomposition,
     subtaskStates: session.subtaskStates,
+    messages: session.messages ?? [],
     costStats: session.costStats,
     createdAt: session.createdAt,
     updatedAt: session.updatedAt,
@@ -130,19 +131,25 @@ router.post('/sessions/:id/message', async (req: Request, res: Response) => {
     res.status(404).json({ error: 'Session not found' });
     return;
   }
+
+  // Validate session state — block if busy
+  if (session.status === 'decomposing' || session.status === 'executing' || session.status === 'aggregating') {
+    res.status(409).json({ error: 'Session is currently processing. Please wait for it to complete before sending a message.' });
+    return;
+  }
+
   const { message } = req.body;
-  if (!message || typeof message !== 'string') {
+  if (!message || typeof message !== 'string' || !message.trim()) {
     res.status(400).json({ error: 'message is required' });
     return;
   }
 
-  // Append to session message history
-  if (!session.messages) session.messages = [];
-  session.messages.push({ role: 'user', content: message, timestamp: Date.now() });
+  // Note: do NOT push to session.messages here — orchestrator.continueSession handles that
+  // to avoid double-storing the message.
 
   // Re-run orchestrator with the new message as context
   const { orchestrator } = await import('../services/orchestrator.js');
-  orchestrator.continueSession(id, message).catch(err => {
+  orchestrator.continueSession(id, message.trim()).catch(err => {
     logger.error({ sessionId: id, error: err }, 'Continue session failed');
   });
 
@@ -155,6 +162,12 @@ router.post('/sessions/:id/reconstruct', async (req: Request, res: Response) => 
   const session = sessionStore.get(id);
   if (!session) {
     res.status(404).json({ error: 'Session not found' });
+    return;
+  }
+
+  // Guard against concurrent processing
+  if (session.status === 'decomposing' || session.status === 'executing' || session.status === 'aggregating') {
+    res.status(409).json({ error: 'Session is currently processing. Please wait.' });
     return;
   }
 

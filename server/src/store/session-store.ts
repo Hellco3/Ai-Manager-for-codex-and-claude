@@ -130,8 +130,10 @@ export class SessionStore {
     const session = this.sessions.get(sessionId);
     if (!session) return undefined;
     session.decomposition = decomposition;
+    // Reset subtask states to clear old run data
+    session.subtaskStates = {};
     for (const st of decomposition.subtasks) {
-      session.subtaskStates![st.id] = {
+      session.subtaskStates[st.id] = {
         subtask: st,
         status: 'pending',
         retryCount: 0,
@@ -208,6 +210,16 @@ export class SessionStore {
     const session = this.sessions.get(sessionId);
     if (!session) return undefined;
     session.costStats.push(stats);
+    session.updatedAt = Date.now();
+    this.markDirty();
+    return session;
+  }
+
+  addMessage(sessionId: string, role: string, content: string): SessionState | undefined {
+    const session = this.sessions.get(sessionId);
+    if (!session) return undefined;
+    if (!session.messages) session.messages = [];
+    session.messages.push({ role, content, timestamp: Date.now() });
     session.updatedAt = Date.now();
     this.markDirty();
     return session;

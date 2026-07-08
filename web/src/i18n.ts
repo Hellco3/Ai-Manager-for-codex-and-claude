@@ -92,6 +92,20 @@ const zh = {
     { icon: '🔄', title: '并行执行', desc: '子任务在 Claude 和 Codex 上并行运行' },
     { icon: '📊', title: '实时进度', desc: '每个子任务的输出实时流式展示' },
   ],
+  chat: {
+    title: '对话',
+    placeholder: '发送跟进消息...',
+    send: '发送',
+    reconstruct: '重新规划',
+    user: '你',
+    assistant: '助手',
+    system: '系统',
+    streaming: '思考中...',
+    justNow: '刚刚',
+    minutesAgo: '分钟前',
+    empty: '暂无消息，发送跟进问题继续对话。',
+    error: '发送消息失败',
+  },
 };
 
 const en: typeof zh = {
@@ -187,6 +201,20 @@ const en: typeof zh = {
     { icon: '🔄', title: 'Parallel Execution', desc: 'Subtasks run concurrently on Claude & Codex' },
     { icon: '📊', title: 'Real-time Progress', desc: 'Live streaming of every subtask\'s output' },
   ],
+  chat: {
+    title: 'Conversation',
+    placeholder: 'Send a follow-up message...',
+    send: 'Send',
+    reconstruct: 'Re-plan',
+    user: 'You',
+    assistant: 'Assistant',
+    system: 'System',
+    streaming: 'Thinking...',
+    justNow: 'just now',
+    minutesAgo: 'm ago',
+    empty: 'No messages yet. Ask a follow-up question to continue.',
+    error: 'Failed to send message',
+  },
 };
 
 // 从 .env 的 LANGUAGE 变量或浏览器语言检测

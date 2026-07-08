@@ -44,11 +44,12 @@ ai_manager/
 │       ├── pages/          # TaskSubmit (提交) / TaskProgress (进度)
 │       ├── components/
 │       │   ├── pipeline/   # SwimLane / PipelineView / SubtaskList / LogDrawer
+│       │   ├── chat/       # ChatPanel / ChatMessage / ChatInput (对话功能)
 │       │   ├── task/       # TaskForm / DecompositionReview
 │       │   ├── stats/      # CostPanel / TimePanel
-│       │   └── common/     # StatusBadge
+│       │   └── common/     # StatusBadge / ThemeToggle
 │       ├── hooks/useSSE.ts # SSE 连接 + 断线重连
-│       └── store/          # Zustand 状态管理
+│       └── store/          # Zustand 状态管理 (pipeline / session / theme)
 └── tsconfig.base.json
 ```
 
@@ -57,16 +58,20 @@ ai_manager/
 - **智能拆解**: Claude Opus 4.8 分析任务，JSON Schema 结构化输出子任务
 - **并行执行**: DAG 依赖解析，最大 5 并发，Claude API + Codex CLI 双引擎
 - **实时进度**: SSE 推送，泳道式 UI 展示 Claude/Codex 并行任务流
+- **多轮对话**: 任务完成后可在聊天面板中继续对话，AI 会重新分析并执行
+- **流式 AI 回复**: SSE 实时推送 AI 的对话响应（逐字流式输出）
 - **双模式**: 全自动（一键执行）/ 半自动（先审核拆解再执行）
+- **主题切换**: 暗色 / 亮色模式切换，持久化到 localStorage
+- **移动端适配**: 对话面板在移动端自动切换为底部抽屉 + FAB 按钮
 - **成本追踪**: Token 消耗 + 耗时统计
 - **生产保障**: 文件持久化、限流、pino 日志、优雅关闭、AbortSignal 传播
 
 ## 快速开始
 
 ```bash
-# 1. 配置 API Key
+# 1. 配置环境变量
 cp .env.example .env
-# 编辑 .env 填入 ANTHROPIC_API_KEY=sk-ant-api03-...
+# 无需 API Key — 复用 CCSwitch 代理
 
 # 2. 启动
 npm run dev
@@ -80,30 +85,57 @@ npm run dev
 | Method | Path | Description |
 |--------|------|-------------|
 | POST | `/api/tasks` | 提交任务 → 返回 sessionId |
-| GET | `/api/tasks/:id` | 查询任务状态 + 成本统计 |
+| GET | `/api/tasks/:id` | 查询任务状态 + 对话历史 + 成本统计 |
 | POST | `/api/tasks/:id/approve` | 半自动模式确认拆解 |
 | POST | `/api/tasks/:id/cancel` | 取消任务 (终止进程) |
+| POST | `/api/sessions/:id/message` | 发送跟进消息（多轮对话） |
+| POST | `/api/sessions/:id/reconstruct` | 重新规划未完成的子任务 |
 | GET | `/api/sessions/:id/stream` | SSE 实时进度流 |
+
+## 多轮对话
+
+任务完成后，可在右侧（桌面端）或底部抽屉（移动端）打开对话面板：
+
+1. 在输入框中输入跟进消息（如"增加错误处理"、"优化性能"）
+2. AI 先流式回复你的问题，然后重新拆解并执行新的子任务
+3. 所有对话历史保存在会话中，刷新页面后依然可见
+4. 点击"重新规划"按钮可基于当前状态重新分析
+
+## SSE 事件类型
+
+| 事件 | 说明 |
+|------|------|
+| `session:created` | 会话已创建 |
+| `stage:started` / `stage:completed` | 阶段状态变更 |
+| `stage:awaiting_review` | 半自动模式等待审核 |
+| `subtask:started` / `subtask:progress` / `subtask:completed` / `subtask:failed` / `subtask:timed_out` | 子任务状态流 |
+| `message:chunk` | AI 对话流式输出片段 |
+| `message:complete` | AI 对话消息完成 |
+| `session:complete` / `session:error` | 会话完成 / 错误 |
+| `cost:update` | 成本更新 |
+| `heartbeat` | 心跳（15s） |
 
 ## 环境变量
 
 | 变量 | 默认值 | 说明 |
 |------|--------|------|
-| `ANTHROPIC_API_KEY` | (必需) | Anthropic API 密钥 |
+| `ANTHROPIC_BASE_URL` | `http://127.0.0.1:15721` | CCSwitch 代理地址 |
+| `ANTHROPIC_AUTH_TOKEN` | `PROXY_MANAGED` | CCSwitch 认证令牌 |
 | `DECOMPOSER_MODEL` | `claude-opus-4-8` | 拆解模型 |
-| `EXECUTOR_MODEL` | `claude-sonnet-5` | 执行模型 |
+| `EXECUTOR_MODEL` | `claude-sonnet-5` | 执行 + 对话模型 |
 | `CODEX_CLI_PATH` | `codex` | Codex CLI 路径 |
 | `CODEX_TIMEOUT_MS` | `300000` | Codex 执行超时 (ms) |
 | `MAX_CONCURRENT_SUBTASKS` | `5` | 最大并行子任务数 |
 | `PORT` | `3001` | 服务端口 |
+| `LANGUAGE` | `zh` | 界面语言 (zh / en) |
 
 ## 技术栈
 
 | 层 | 技术 |
 |---|------|
-| 后端 | Node.js + TypeScript + Express |
-| AI | @anthropic-ai/sdk (Opus 4.8 / Sonnet 5) |
-| 前端 | React 19 + Vite + Tailwind CSS |
+| 后端 | Node.js + TypeScript + Express 5 |
+| AI | @anthropic-ai/sdk (Opus 4.8 / Sonnet 5 via CCSwitch) |
+| 前端 | React 19 + Vite + Tailwind CSS 4 |
 | 状态 | Zustand |
 | 动画 | Framer Motion |
 | 实时 | Server-Sent Events (SSE) |

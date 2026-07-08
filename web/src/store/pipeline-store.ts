@@ -14,6 +14,12 @@ interface StageEntry {
   completedAt?: number;
 }
 
+interface ChatMessage {
+  role: string;
+  content: string;
+  timestamp: number;
+}
+
 interface PipelineStore {
   stages: Record<string, StageEntry>;
   subtasks: Record<string, SubtaskState & { kind?: string }>;
@@ -26,10 +32,21 @@ interface PipelineStore {
   isError: boolean;
   errorMessage: string | null;
 
+  // Chat state
+  messages: ChatMessage[];
+  isStreaming: boolean;
+  streamingContent: string;
+
   applySSEEvent: (event: SSEEvent) => void;
-  hydrateFromSession: (session: SessionState) => void;
+  hydrateFromSession: (session: any) => void;
   initStages: () => void;
   reset: () => void;
+
+  // Chat actions
+  addUserMessage: (message: string) => void;
+  removeLastUserMessage: () => void;
+  appendStreamingChunk: (chunk: string) => void;
+  commitStreamingMessage: (role: string, timestamp: number) => void;
 }
 
 const DEFAULT_STAGES: Record<string, StageEntry> = {
@@ -174,6 +191,11 @@ export const usePipelineStore = create<PipelineStore>((set, get) => ({
   isError: false,
   errorMessage: null,
 
+  // Chat state
+  messages: [],
+  isStreaming: false,
+  streamingContent: '',
+
   initStages: () => set({
     stages: createDefaultStages(),
     subtasks: {},
@@ -185,6 +207,9 @@ export const usePipelineStore = create<PipelineStore>((set, get) => ({
     isComplete: false,
     isError: false,
     errorMessage: null,
+    messages: [],
+    isStreaming: false,
+    streamingContent: '',
   }),
 
   hydrateFromSession: (session) => {
@@ -198,8 +223,8 @@ export const usePipelineStore = create<PipelineStore>((set, get) => ({
       currentStage: getCurrentStage(session),
       decomposition: session.decomposition ?? null,
       costStats: session.costStats,
-      totalCost: session.costStats.reduce((sum, stat) => sum + stat.costUSD, 0),
-      totalDurationMs: session.costStats.reduce((sum, stat) => sum + stat.durationMs, 0),
+      totalCost: session.costStats.reduce((sum: number, stat: any) => sum + stat.costUSD, 0),
+      totalDurationMs: session.costStats.reduce((sum: number, stat: any) => sum + stat.durationMs, 0),
       isComplete: session.status === 'completed',
       isError: session.status === 'failed' || session.status === 'cancelled' || session.status === 'timed_out',
       errorMessage: session.status === 'cancelled'
@@ -207,6 +232,9 @@ export const usePipelineStore = create<PipelineStore>((set, get) => ({
         : session.status === 'timed_out'
           ? 'Task timed out'
           : null,
+      messages: session.messages ?? [],
+      isStreaming: false,
+      streamingContent: '',
     });
   },
 
@@ -427,6 +455,34 @@ export const usePipelineStore = create<PipelineStore>((set, get) => ({
         });
         break;
 
+      case 'message:chunk':
+        set((s) => ({
+          isStreaming: true,
+          streamingContent: s.streamingContent + (event as any).chunk,
+        }));
+        break;
+
+      case 'message:complete': {
+        const msgEvent = event as any;
+        set((s) => {
+          // Deduplicate: skip if the last message already matches this one
+          const lastMsg = s.messages[s.messages.length - 1];
+          if (lastMsg && lastMsg.role === msgEvent.role && lastMsg.content === msgEvent.content) {
+            return s;
+          }
+          return {
+            isStreaming: false,
+            streamingContent: '',
+            messages: [...s.messages, {
+              role: msgEvent.role,
+              content: msgEvent.content,
+              timestamp: msgEvent.timestamp,
+            }],
+          };
+        });
+        break;
+      }
+
       case 'heartbeat':
         break;
     }
@@ -443,5 +499,47 @@ export const usePipelineStore = create<PipelineStore>((set, get) => ({
     isComplete: false,
     isError: false,
     errorMessage: null,
+    messages: [],
+    isStreaming: false,
+    streamingContent: '',
+  }),
+
+  // Chat actions
+  addUserMessage: (message) => set((s) => ({
+    messages: [...s.messages, {
+      role: 'user',
+      content: message,
+      timestamp: Date.now(),
+    }],
+  })),
+
+  removeLastUserMessage: () => set((s) => {
+    const msgs = [...s.messages];
+    // Remove last user message from the end
+    for (let i = msgs.length - 1; i >= 0; i--) {
+      if (msgs[i].role === 'user') {
+        msgs.splice(i, 1);
+        break;
+      }
+    }
+    return { messages: msgs };
+  }),
+
+  appendStreamingChunk: (chunk) => set((s) => ({
+    isStreaming: true,
+    streamingContent: s.streamingContent + chunk,
+  })),
+
+  commitStreamingMessage: (role, timestamp) => set((s) => {
+    if (!s.streamingContent) return s;
+    return {
+      isStreaming: false,
+      streamingContent: '',
+      messages: [...s.messages, {
+        role,
+        content: s.streamingContent,
+        timestamp,
+      }],
+    };
   }),
 }));

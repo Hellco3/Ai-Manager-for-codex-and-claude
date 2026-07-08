@@ -16,6 +16,8 @@ export const SSEEventType = z.enum([
   'session:complete',
   'session:error',
   'cost:update',
+  'message:chunk',
+  'message:complete',
   'heartbeat',
 ]);
 export type SSEEventType = z.infer<typeof SSEEventType>;
@@ -35,6 +37,8 @@ export const SSEEvent = z.discriminatedUnion('type', [
   z.object({ id: z.string().optional(), type: z.literal('session:complete'), result: AggregatedResult }),
   z.object({ id: z.string().optional(), type: z.literal('session:error'), error: z.string() }),
   z.object({ id: z.string().optional(), type: z.literal('cost:update'), stats: CostStats }),
+  z.object({ id: z.string().optional(), type: z.literal('message:chunk'), chunk: z.string() }),
+  z.object({ id: z.string().optional(), type: z.literal('message:complete'), content: z.string(), role: z.string(), timestamp: z.number() }),
   z.object({ id: z.string().optional(), type: z.literal('heartbeat'), timestamp: z.number() }),
 ]);
 export type SSEEvent = z.infer<typeof SSEEvent>;

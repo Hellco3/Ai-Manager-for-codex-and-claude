@@ -304,24 +304,36 @@ class Orchestrator {
     const session = sessionStore.get(sessionId);
     if (!session) return;
 
+    // Set status to decomposing immediately to prevent race conditions
+    sessionStore.updateStatus(sessionId, 'decomposing');
+
     const abortController = new AbortController();
     this.activeRuns.set(sessionId, abortController);
     const costTracker = this.costTrackers.get(sessionId) ?? new CostTracker();
     this.costTrackers.set(sessionId, costTracker);
 
-    // Broadcast conversation message to SSE
+    // Store user message (only source of truth — route handler does NOT push)
+    sessionStore.addMessage(sessionId, 'user', message);
+
+    // Broadcast user message to SSE for connected clients
     sseManager.broadcast(sessionId, {
-      type: 'subtask:progress',
-      subtaskId: 'conversation',
-      chunk: `[用户] ${message}\n`,
+      type: 'message:complete',
+      content: message,
+      role: 'user',
+      timestamp: Date.now(),
     });
 
     // Re-decompose with conversation context
     try {
-      sessionStore.updateStatus(sessionId, 'decomposing');
+      // Phase 1: Generate conversational AI response (streaming)
+      await this.streamChatResponse(sessionId, message, abortController.signal);
+
+      // Phase 2: Re-decompose
+      this.broadcastStage(sessionId, 'stage:started', 'decompose');
+
       const { decomposeTask } = await import('./decomposer.js');
 
-      // Build context from previous messages
+      // Build context from conversation history
       let contextTask = session.task;
       if (session.messages && session.messages.length > 0) {
         const history = session.messages.map(m => `${m.role}: ${m.content}`).join('\n');
@@ -335,8 +347,20 @@ class Orchestrator {
 
       const stats = costTracker.addEntry(config.DECOMPOSER_MODEL, inputTokens, outputTokens, 0);
       sseManager.broadcast(sessionId, { type: 'cost:update', stats });
+      this.broadcastStage(sessionId, 'stage:completed', 'decompose');
 
-      // Execute new decomposition
+      // Notify chat about new plan
+      const planSummary = decomposition.overview +
+        `\n\nI've created ${decomposition.subtasks.length} subtasks to handle this. Estimated time: ${decomposition.estimatedTimeMinutes ?? 'unknown'} min.`;
+      sseManager.broadcast(sessionId, {
+        type: 'message:complete',
+        content: planSummary,
+        role: 'assistant',
+        timestamp: Date.now(),
+      });
+      sessionStore.addMessage(sessionId, 'assistant', planSummary);
+
+      // Phase 3: Execute new plan
       await this.runExecuteStage(sessionId, costTracker, abortController.signal);
       await this.runAggregateStage(sessionId, costTracker);
       this.completeSession(sessionId, costTracker);
@@ -348,10 +372,94 @@ class Orchestrator {
     }
   }
 
+  /**
+   * Generate a streaming conversational AI response via Claude.
+   */
+  private async streamChatResponse(
+    sessionId: string,
+    userMessage: string,
+    signal: AbortSignal,
+  ): Promise<void> {
+    const session = sessionStore.get(sessionId)!;
+    let fullResponse = '';
+
+    try {
+      const Anthropic = (await import('@anthropic-ai/sdk')).default;
+
+      const anthropic = new Anthropic({
+        apiKey: config.ANTHROPIC_API_KEY,
+        baseURL: config.ANTHROPIC_BASE_URL,
+      });
+
+      // Build conversation context
+      const historyMessages = (session.messages ?? [])
+        .filter(m => m.role === 'user' || m.role === 'assistant')
+        .slice(-10) // last 10 messages for context
+        .map(m => ({
+          role: m.role as 'user' | 'assistant',
+          content: m.content,
+        }));
+
+      const stream = anthropic.messages.stream({
+        model: config.EXECUTOR_MODEL,
+        max_tokens: 4000,
+        system: `You are a helpful AI assistant in a task orchestration system. The user has submitted a task: "${session.task}".
+
+You are having a conversation about this task. Be concise, helpful, and collaborative. Acknowledge the user's request and explain what you'll do next. After your response, the system will re-decompose and execute subtasks automatically.
+
+CRITICAL: Keep responses brief (2-4 sentences). The system handles execution — you just need to communicate clearly with the user.`,
+        messages: [
+          ...historyMessages,
+          { role: 'user' as const, content: userMessage },
+        ],
+      });
+
+      for await (const event of stream) {
+        if (signal.aborted) {
+          stream.controller.abort();
+          throw new DOMException('Chat response cancelled', 'AbortError');
+        }
+        if (event.type === 'content_block_delta' && event.delta.type === 'text_delta') {
+          const text = (event.delta as any).text as string;
+          fullResponse += text;
+          sseManager.broadcast(sessionId, {
+            type: 'message:chunk',
+            chunk: text,
+          });
+        }
+      }
+
+      // Finalize the streaming message
+      if (fullResponse) {
+        sseManager.broadcast(sessionId, {
+          type: 'message:complete',
+          content: fullResponse,
+          role: 'assistant',
+          timestamp: Date.now(),
+        });
+        sessionStore.addMessage(sessionId, 'assistant', fullResponse);
+      }
+    } catch (error: any) {
+      if (error.name === 'AbortError') throw error;
+      logger.error({ sessionId, error }, 'Chat response streaming failed');
+      // Non-fatal: continue with re-decomposition even if chat response fails
+      sseManager.broadcast(sessionId, {
+        type: 'message:complete',
+        content: `I'll help you with that. Let me re-analyze the task.`,
+        role: 'assistant',
+        timestamp: Date.now(),
+      });
+      sessionStore.addMessage(sessionId, 'assistant', `I'll help you with that. Let me re-analyze the task.`);
+    }
+  }
+
   /** Re-decompose remaining work in a session */
   async reconstructSession(sessionId: string): Promise<void> {
     const session = sessionStore.get(sessionId);
     if (!session) return;
+
+    // Set status immediately to prevent concurrent execution
+    sessionStore.updateStatus(sessionId, 'decomposing');
 
     const abortController = new AbortController();
     this.activeRuns.set(sessionId, abortController);
@@ -359,7 +467,6 @@ class Orchestrator {
     this.costTrackers.set(sessionId, costTracker);
 
     try {
-      sessionStore.updateStatus(sessionId, 'decomposing');
 
       // Build context from completed subtasks and messages
       const completedResults: string[] = [];
@@ -391,6 +498,8 @@ class Orchestrator {
     } catch (error: any) {
       if (error.name === 'AbortError') return;
       logger.error({ sessionId, error }, 'Reconstruct session failed');
+      sessionStore.updateStatus(sessionId, 'failed');
+      sseManager.broadcast(sessionId, { type: 'session:error', error: error.message || 'Unknown error' });
     }
   }
 

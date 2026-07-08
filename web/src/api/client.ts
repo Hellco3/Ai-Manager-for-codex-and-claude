@@ -83,3 +83,22 @@ export function createSSEConnection(
 
   return es;
 }
+
+export async function sendMessage(
+  sessionId: string,
+  message: string,
+): Promise<void> {
+  const res = await fetch(`${BASE_URL}/sessions/${sessionId}/message`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ message }),
+  });
+  if (!res.ok) throw await parseError(res);
+}
+
+export async function reconstructSession(sessionId: string): Promise<void> {
+  const res = await fetch(`${BASE_URL}/sessions/${sessionId}/reconstruct`, {
+    method: 'POST',
+  });
+  if (!res.ok) throw await parseError(res);
+}

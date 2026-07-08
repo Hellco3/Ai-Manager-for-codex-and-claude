@@ -23,6 +23,60 @@
       linear-gradient(90deg, rgba(148, 163, 184, 0.03) 1px, transparent 1px);
     background-size: 40px 40px;
   }
+
+  /* Light theme overrides */
+  .light body,
+  .light {
+    background: linear-gradient(135deg, #f8fafc 0%, #e2e8f0 100%);
+  }
+
+  .light .bg-grid {
+    background-image:
+      linear-gradient(rgba(100, 116, 139, 0.05) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(100, 116, 139, 0.05) 1px, transparent 1px);
+  }
+
+  .light .stage-card {
+    background: rgba(255, 255, 255, 0.8);
+    border-color: rgba(203, 213, 225, 0.5);
+  }
+
+  .light .stage-card:hover {
+    background: rgba(255, 255, 255, 0.95);
+  }
+
+  .light .stage-card.active {
+    background: rgba(255, 255, 255, 0.9);
+  }
+
+  .light .text-white {
+    color: #1e293b;
+  }
+
+  .light .text-slate-200 {
+    color: #334155;
+  }
+
+  .light .text-slate-300 {
+    color: #475569;
+  }
+
+  .light .text-slate-400 {
+    color: #64748b;
+  }
+
+  .light .text-slate-500 {
+    color: #94a3b8;
+  }
+
+  .light .text-slate-600 {
+    color: #94a3b8;
+  }
+
+  .light header {
+    background: rgba(255, 255, 255, 0.7);
+    border-color: rgba(203, 213, 225, 0.5);
+  }
 }
 
 @layer components {
