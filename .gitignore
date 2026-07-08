@@ -1,0 +1,9 @@
+node_modules/
+dist/
+data/
+.env
+*.log
+web/dist/
+server/dist/
+server/dist/
+server/dist/

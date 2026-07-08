@@ -1,0 +1,85 @@
+import type { SSEEvent, SessionState, Subtask } from '@ai_manager/shared';
+
+const BASE_URL = '/api';
+
+async function parseError(res: Response): Promise<Error> {
+  const fallback = `HTTP ${res.status}`;
+
+  try {
+    const body = await res.json();
+    const message = typeof body?.error === 'string' ? body.error : fallback;
+    const details = typeof body?.details === 'string'
+      ? `: ${body.details}`
+      : Array.isArray(body?.details)
+        ? `: ${body.details.join(', ')}`
+        : '';
+    return new Error(`${message}${details}`);
+  } catch {
+    return new Error(fallback);
+  }
+}
+
+export async function postTask(
+  task: string,
+  mode: 'auto' | 'semi-auto',
+): Promise<{ sessionId: string; status: SessionState['status'] }> {
+  const res = await fetch(`${BASE_URL}/tasks`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ task, mode }),
+  });
+  if (!res.ok) {
+    throw await parseError(res);
+  }
+  return res.json();
+}
+
+export async function getTask(sessionId: string): Promise<SessionState> {
+  const res = await fetch(`${BASE_URL}/tasks/${sessionId}`);
+  if (!res.ok) {
+    throw await parseError(res);
+  }
+  return res.json();
+}
+
+export async function approveDecomposition(sessionId: string, subtasks?: Subtask[]): Promise<void> {
+  const res = await fetch(`${BASE_URL}/tasks/${sessionId}/approve`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ subtasks }),
+  });
+  if (!res.ok) {
+    throw await parseError(res);
+  }
+}
+
+export async function cancelTask(sessionId: string): Promise<void> {
+  const res = await fetch(`${BASE_URL}/tasks/${sessionId}/cancel`, { method: 'POST' });
+  if (!res.ok) {
+    throw await parseError(res);
+  }
+}
+
+export function createSSEConnection(
+  sessionId: string,
+  onEvent: (event: SSEEvent) => void,
+  onError?: (error: Event) => void,
+): EventSource {
+  const url = `${BASE_URL}/sessions/${sessionId}/stream`;
+  const es = new EventSource(url);
+
+  es.onmessage = (msg) => {
+    try {
+      const event = JSON.parse(msg.data);
+      onEvent(event);
+    } catch {
+      // Ignore parse errors for heartbeat events
+    }
+  };
+
+  if (onError) {
+    es.onerror = onError;
+  }
+
+  return es;
+}

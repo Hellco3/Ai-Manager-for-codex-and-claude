@@ -1,0 +1,56 @@
+@import "tailwindcss";
+
+@layer base {
+  :root {
+    --color-pending: #94a3b8;
+    --color-running: #60a5fa;
+    --color-completed: #34d399;
+    --color-failed: #f87171;
+    --color-timed-out: #fb923c;
+    --color-cancelled: #a78bfa;
+  }
+
+  body {
+    font-family: 'Inter', system-ui, -apple-system, sans-serif;
+    background: linear-gradient(135deg, #0f172a 0%, #1e293b 100%);
+    min-height: 100vh;
+  }
+
+  /* Subtle grid background */
+  .bg-grid {
+    background-image:
+      linear-gradient(rgba(148, 163, 184, 0.03) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(148, 163, 184, 0.03) 1px, transparent 1px);
+    background-size: 40px 40px;
+  }
+}
+
+@layer components {
+  .status-pending { background-color: var(--color-pending); }
+  .status-running { background-color: var(--color-running); animation: pulse 2s infinite; }
+  .status-completed { background-color: var(--color-completed); }
+  .status-failed { background-color: var(--color-failed); }
+  .status-timed_out { background-color: var(--color-timed-out); }
+  .status-cancelled { background-color: var(--color-cancelled); }
+
+  .stage-card {
+    @apply relative rounded-xl border border-slate-700/50 bg-slate-800/50 backdrop-blur-sm p-6 transition-all duration-300;
+  }
+
+  .stage-card:hover {
+    @apply border-slate-600/50 bg-slate-800/70 shadow-lg shadow-blue-500/5;
+  }
+
+  .stage-card.active {
+    @apply border-blue-500/50 bg-slate-800/80 shadow-xl shadow-blue-500/10;
+  }
+
+  .gradient-text {
+    @apply bg-gradient-to-r from-blue-400 to-purple-400 bg-clip-text text-transparent;
+  }
+}
+
+@keyframes pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.6; }
+}
