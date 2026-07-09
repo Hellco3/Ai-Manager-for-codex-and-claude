@@ -78,9 +78,9 @@ function mapStatus(status: string): LaneStatus {
 }
 
 function getLane(kind: string | undefined, index: number): LaneId {
-  if (kind === 'analysis' || kind === 'research') return 'claude';
+  if (kind === 'analysis' || kind === 'research' || kind === 'design') return 'claude';
   if (kind === 'code' || kind === 'integration') return 'codex';
-  if (kind === 'design') return index % 2 === 0 ? 'claude' : 'codex';
+  // Default: alternate between lanes
   return index % 2 === 0 ? 'claude' : 'codex';
 }
 
