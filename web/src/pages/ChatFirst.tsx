@@ -123,6 +123,10 @@ export default function ChatFirst() {
       return true;
     }
 
+    // Auto-confirm guard: if the user has been discussing but hasn't confirmed yet,
+    // the AI should be asking for confirmation. Do NOT bypass with the keyword detection.
+    // If no keywords match, just send the message normally — AI will guide to confirm.
+
     if (!sessionId) {
       try {
         const hasStagedAttachments = useUploadStore.getState().items.some(
