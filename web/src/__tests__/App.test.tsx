@@ -11,7 +11,7 @@ describe('App', () => {
         <App />
       </BrowserRouter>,
     );
-    expect(screen.getByText('AI')).toBeInTheDocument();
+    expect(screen.getByRole('heading', { level: 1 })).toBeInTheDocument();
   });
 
   it('renders the i18n header', () => {

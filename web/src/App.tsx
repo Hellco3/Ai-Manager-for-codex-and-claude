@@ -24,7 +24,6 @@ export default function App() {
               </svg>
             </div>
             <h1 className="text-lg font-semibold">
-              <span className="text-white">AI</span>{' '}
               <span className="gradient-text">{t.app.title}</span>
             </h1>
           </div>
