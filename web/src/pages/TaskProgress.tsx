@@ -94,9 +94,9 @@ export default function TaskProgress() {
   const showChat = isComplete || messages.length > 0;
 
   return (
-    <div className="mx-auto">
-      {/* Header */}
-      <div className="flex items-center justify-between mb-8 flex-wrap gap-4">
+    <div className="h-full flex flex-col px-4 sm:px-6 py-4">
+      {/* Header — compact */}
+      <div className="flex items-center justify-between mb-4 flex-wrap gap-3 shrink-0">
         <div>
           <button onClick={handleNewTask} className="text-sm text-slate-500 hover:text-slate-300 inline-flex items-center gap-1 mb-2">
             <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" /></svg>
@@ -142,9 +142,9 @@ export default function TaskProgress() {
       )}
 
       {/* Two-column layout */}
-      <div className="flex gap-6 flex-col xl:flex-row">
+      <div className="flex gap-4 flex-1 min-h-0 flex-col xl:flex-row">
         {/* Pipeline column */}
-        <div className="flex-1 min-w-0 space-y-6">
+        <div className="flex-1 min-w-0 space-y-4 overflow-y-auto">
           {/* Pipeline */}
           <PipelineView stages={stages} currentStage={currentStage} stageLabels={stageLabels} stageIcons={stageIcons} subtasks={subtasks} />
 

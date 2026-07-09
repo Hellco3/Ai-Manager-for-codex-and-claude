@@ -172,7 +172,7 @@ export default function SessionSidebar() {
   return (
     <>
       {/* Desktop sidebar */}
-      <aside className="flex h-[100dvh] w-[224px] shrink-0 flex-col border-r border-slate-700/50 bg-slate-900/50 backdrop-blur-sm pt-16 max-md:hidden">
+      <aside className="flex h-full w-[224px] shrink-0 flex-col border-r border-slate-700/50 bg-slate-900/50 backdrop-blur-sm max-md:hidden">
         {sidebarContent}
       </aside>
 

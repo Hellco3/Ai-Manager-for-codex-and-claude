@@ -27,10 +27,10 @@ export default function App() {
         </div>
       </header>
 
-      {/* Main Content */}
-      <main className="flex">
+      {/* Main Content — full viewport height, no gaps */}
+      <main className="flex" style={{ height: 'calc(100dvh - 64px)' }}>
         <SessionSidebar />
-        <div className="flex-1 min-w-0 px-4 sm:px-6 py-8">
+        <div className="flex-1 min-w-0 overflow-hidden">
           <Routes>
             <Route path="/" element={<ChatFirst />} />
             <Route path="/task/:sessionId" element={<TaskProgress />} />
