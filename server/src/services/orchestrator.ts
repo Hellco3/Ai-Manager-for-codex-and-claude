@@ -608,8 +608,8 @@ class Orchestrator {
 
       try {
         for await (const event of stream) {
-          // Clear timeouts on each event
-          if (idleTimer) clearTimeout(idleTimer);
+          // Clear idle timeout on each event
+          resetIdleTimer();
           if (signal.aborted) {
             stream.controller.abort();
             throw new DOMException('Chat response cancelled', 'AbortError');
@@ -622,7 +622,6 @@ class Orchestrator {
               chunk: text,
             });
           }
-          resetIdleTimer();
         }
       } finally {
         if (idleTimer) clearTimeout(idleTimer);
