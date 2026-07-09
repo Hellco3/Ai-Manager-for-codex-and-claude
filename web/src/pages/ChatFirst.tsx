@@ -460,7 +460,7 @@ export default function ChatFirst() {
               </div>
             )}
 
-            {messages.map((msg, idx) => (
+            {messages.map((msg) => (
               <ChatMessage
                 key={msg.id ?? `${msg.role}-${msg.timestamp}-${msg.content.slice(0, 32)}`}
                 role={msg.role}
