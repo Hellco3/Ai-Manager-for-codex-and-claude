@@ -41,7 +41,9 @@ export default function FilePreview({
 }: FilePreviewProps) {
   const reduceMotion = useReducedMotion();
   const [lightboxOpen, setLightboxOpen] = useState(false);
+  const dialogRef = useRef<HTMLDivElement>(null);
   const closeButtonRef = useRef<HTMLButtonElement>(null);
+  const lastFocusedElementRef = useRef<HTMLElement | null>(null);
   const name = attachment?.originalName ?? fileName ?? 'unknown';
   const size = attachment?.size ?? fileSize ?? 0;
   const mime = attachment?.mimeType ?? mimeType ?? 'application/octet-stream';
@@ -67,24 +69,65 @@ export default function FilePreview({
     if (e.key === 'Escape') {
       e.preventDefault();
       setLightboxOpen(false);
-      return;
-    }
-
-    if (e.key === 'Tab') {
-      e.preventDefault();
-      closeButtonRef.current?.focus();
     }
   }, []);
 
   useEffect(() => {
     if (!lightboxOpen) return;
     const originalOverflow = document.body.style.overflow;
+    lastFocusedElementRef.current = document.activeElement instanceof HTMLElement ? document.activeElement : null;
     document.body.style.overflow = 'hidden';
-    closeButtonRef.current?.focus();
+    const focusables = dialogRef.current?.querySelectorAll<HTMLElement>(
+      'button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])',
+    );
+    focusables?.[0]?.focus();
+
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') {
+        event.preventDefault();
+        setLightboxOpen(false);
+        return;
+      }
+
+      if (event.key !== 'Tab') return;
+      // 审计结论：将 Tab 焦点限制在灯箱可交互元素内，避免穿透到底层页面。
+      const nodes = dialogRef.current?.querySelectorAll<HTMLElement>(
+        'button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])',
+      );
+      const focusableElements = nodes ? Array.from(nodes).filter((node) => !node.hasAttribute('disabled')) : [];
+      if (focusableElements.length === 0) {
+        event.preventDefault();
+        return;
+      }
+
+      const first = focusableElements[0];
+      const last = focusableElements[focusableElements.length - 1];
+      const active = document.activeElement;
+
+      if (event.shiftKey && active === first) {
+        event.preventDefault();
+        last.focus();
+      } else if (!event.shiftKey && active === last) {
+        event.preventDefault();
+        first.focus();
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+
     return () => {
+      window.removeEventListener('keydown', handleKeyDown);
       document.body.style.overflow = originalOverflow;
+      lastFocusedElementRef.current?.focus?.();
     };
   }, [lightboxOpen]);
+
+  useEffect(() => {
+    if (!attachment && lightboxOpen) {
+      // 审计结论：附件被移除、会话重置或视图卸载时主动关闭灯箱，避免残留遮罩。
+      setLightboxOpen(false);
+    }
+  }, [attachment, lightboxOpen]);
 
   const lightboxMotion = reduceMotion
     ? { initial: false, animate: { opacity: 1 }, exit: { opacity: 0 } }
@@ -120,7 +163,7 @@ export default function FilePreview({
                 <button
                   type="button"
                   onClick={onRemove}
-                  className="rounded-full border border-slate-700/60 bg-slate-900/90 p-1 text-slate-400 transition-colors hover:border-red-500/40 hover:text-red-200"
+                  className="icon-button h-7 w-7 rounded-full"
                   aria-label="Remove"
                 >
                   <svg className="h-[14px] w-[14px]" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
@@ -166,11 +209,7 @@ export default function FilePreview({
                 </button>
               )}
               {onRemove && (
-                <button
-                  type="button"
-                  onClick={onRemove}
-                  className="rounded-full border border-slate-700/55 bg-slate-900/70 px-2.5 py-1 text-slate-300 transition-colors hover:border-slate-600/70"
-                >
+                <button type="button" onClick={onRemove} className="rounded-full border border-slate-700/55 bg-slate-900/70 px-2.5 py-1 text-slate-300 transition-colors hover:border-slate-600/70">
                   Remove
                 </button>
               )}
@@ -182,7 +221,7 @@ export default function FilePreview({
           <motion.div key={`${name}-image`} {...cardMotion} className="relative shrink-0">
             <button
               type="button"
-              className="file-card group min-w-[150px] cursor-pointer items-center gap-3"
+              className="file-card group min-w-[220px] cursor-pointer items-center gap-3"
               onClick={openLightbox}
               onKeyDown={handlePreviewKeyDown}
               aria-label={`Preview ${name}`}
@@ -194,14 +233,14 @@ export default function FilePreview({
               />
               <div className="min-w-0 flex-1 text-left">
                 <p className="truncate text-xs font-medium text-slate-200">{name}</p>
-                <p className="text-[11px] text-slate-500">{formatSize(size)}</p>
+                <p className="text-[11px] text-slate-500">Image · {formatSize(size)}</p>
               </div>
             </button>
             {onRemove && (
               <button
                 type="button"
                 onClick={onRemove}
-                className="absolute -right-1 -top-1 rounded-full border border-slate-700/60 bg-slate-950/92 p-1 text-slate-400 transition-colors hover:border-red-500/40 hover:text-red-200"
+                className="absolute -right-1 -top-1 flex h-7 w-7 items-center justify-center rounded-full border border-slate-700/60 bg-slate-950/92 text-slate-300 transition-colors hover:border-red-500/40 hover:text-red-200"
                 aria-label="Remove"
               >
                 <svg className="h-[14px] w-[14px]" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
@@ -238,7 +277,7 @@ export default function FilePreview({
               <button
                 type="button"
                 onClick={onRemove}
-                className="absolute -right-1 -top-1 rounded-full border border-slate-700/60 bg-slate-950/92 p-1 text-slate-400 transition-colors hover:border-red-500/40 hover:text-red-200"
+                className="absolute -right-1 -top-1 flex h-7 w-7 items-center justify-center rounded-full border border-slate-700/60 bg-slate-950/92 text-slate-300 transition-colors hover:border-red-500/40 hover:text-red-200"
                 aria-label="Remove"
               >
                 <svg className="h-[14px] w-[14px]" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
@@ -269,6 +308,7 @@ export default function FilePreview({
               transition={{ duration: reduceMotion ? 0 : 0.18 }}
               className="relative flex h-full w-full items-center justify-center md:h-auto md:w-auto"
               onClick={(e) => e.stopPropagation()}
+              ref={dialogRef}
             >
               <img
                 src={getUploadUrl(attachment.storageKey)}
@@ -279,7 +319,7 @@ export default function FilePreview({
                 ref={closeButtonRef}
                 type="button"
                 onClick={() => setLightboxOpen(false)}
-                className="absolute right-4 top-4 rounded-full border border-slate-700/60 bg-slate-950/88 p-2 text-slate-100 transition-colors hover:border-slate-500/70"
+                className="absolute right-4 top-4 flex h-11 w-11 items-center justify-center rounded-full border border-slate-700/60 bg-slate-950/88 text-slate-100 transition-colors hover:border-slate-500/70"
                 aria-label="Close"
               >
                 <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">

@@ -1,4 +1,4 @@
-import React, { useState, useCallback } from 'react';
+import React, { useState, useCallback, useEffect } from 'react';
 import { t } from '../../i18n.js';
 
 interface WorkspaceSelectorProps {
@@ -11,6 +11,12 @@ export default function WorkspaceSelector({ workspaceDir, onUpdate, disabled }: 
   const [editing, setEditing] = useState(false);
   const [value, setValue] = useState(workspaceDir ?? '');
   const [valid, setValid] = useState<boolean | null>(null);
+
+  useEffect(() => {
+    if (!editing) {
+      setValue(workspaceDir ?? '');
+    }
+  }, [workspaceDir, editing]);
 
   const handleSave = useCallback(async () => {
     const trimmed = value.trim();
@@ -35,61 +41,113 @@ export default function WorkspaceSelector({ workspaceDir, onUpdate, disabled }: 
 
   const handleBrowse = async () => {
     try {
-      // Use File System Access API if available
       if ('showDirectoryPicker' in window) {
         const dirHandle = await (window as any).showDirectoryPicker();
-        const dirPath = dirHandle.name; // Only gets directory name, not full path in browsers
+        const dirPath = dirHandle.name;
         setValue(dirPath);
         onUpdate(dirPath);
         setEditing(false);
         setValid(true);
       }
     } catch {
-      // User cancelled
+      // 审计结论：取消目录选择不需要额外提示，保持当前 UI 状态即可。
     }
   };
 
   return (
-    <div className="flex items-center gap-2 px-3 py-2 bg-slate-800/50 border-b border-slate-700/50 shrink-0">
-      <svg className="w-4 h-4 text-slate-500 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z" />
-      </svg>
+    // 审计结论：WorkspaceSelector 已改为与 ChatFirst 新壳层一致的卡片式头部，不再沿用旧工具条样式。
+    <div className="workspace-shell flex shrink-0 items-center gap-3 border-b px-3 py-3 md:px-5">
+      <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl border border-purple-500/18 bg-purple-500/8 text-purple-200 shadow-lg shadow-purple-500/10">
+        <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z" />
+        </svg>
+      </div>
 
       {editing ? (
-        <div className="flex items-center gap-1 flex-1">
+        <div className="flex flex-1 items-center gap-2">
           <input
             type="text"
             value={value}
-            onChange={(e) => { setValue(e.target.value); setValid(null); }}
-            onKeyDown={(e) => { if (e.key === 'Enter') handleSave(); if (e.key === 'Escape') setEditing(false); }}
+            onChange={(e) => {
+              setValue(e.target.value);
+              setValid(null);
+            }}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter') handleSave();
+              if (e.key === 'Escape') {
+                setEditing(false);
+                setValue(workspaceDir ?? '');
+                setValid(null);
+              }
+            }}
             placeholder={t.workspace.placeholder}
-            className="flex-1 bg-slate-900/80 border border-slate-700/50 rounded px-2 py-1 text-xs text-slate-200 placeholder-slate-600 focus:outline-none focus:border-blue-500/50"
+            className="min-w-0 flex-1 rounded-2xl border border-slate-700/50 bg-slate-950/55 px-3 py-2 text-sm text-slate-100 placeholder-slate-500 outline-none transition-colors focus:border-purple-500/40"
             autoFocus
             disabled={disabled}
           />
-          <button onClick={handleSave} className="px-2 py-1 rounded text-[10px] bg-blue-600 text-white hover:bg-blue-500" disabled={disabled}>
+          <button
+            onClick={handleSave}
+            className="rounded-2xl bg-purple-500 px-3 py-2 text-xs font-medium text-white transition-colors hover:bg-purple-400 disabled:opacity-40"
+            disabled={disabled}
+            type="button"
+          >
             {t.workspace.save}
           </button>
-          <button onClick={() => { setEditing(false); setValue(workspaceDir ?? ''); setValid(null); }} className="px-2 py-1 rounded text-[10px] bg-slate-700 text-slate-400 hover:text-slate-200">
-            ✕
+          <button
+            onClick={() => {
+              setEditing(false);
+              setValue(workspaceDir ?? '');
+              setValid(null);
+            }}
+            className="icon-button h-10 w-10"
+            aria-label={t.progress.cancel}
+            type="button"
+          >
+            <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M6 18L18 6M6 6l12 12" />
+            </svg>
           </button>
         </div>
       ) : (
-        <div className="flex items-center gap-2 flex-1 min-w-0">
-          <span className="text-xs text-slate-400 truncate flex-1" title={workspaceDir ?? ''}>
-            {workspaceDir ?? t.workspace.default}
-          </span>
-          <button onClick={() => { handleBrowse(); }} className="px-1.5 py-0.5 rounded text-[10px] bg-slate-700/50 text-slate-400 hover:text-slate-200" title={t.workspace.browse} disabled={disabled}>
-            📁
+        <div className="flex min-w-0 flex-1 items-center gap-3">
+          <div className="min-w-0 flex-1">
+            <div className="text-[11px] uppercase tracking-[0.18em] text-slate-500">Workspace</div>
+            <span className="mt-1 block truncate text-sm text-slate-300" title={workspaceDir ?? ''}>
+              {workspaceDir ?? t.workspace.default}
+            </span>
+          </div>
+          <button onClick={handleBrowse} className="icon-button h-10 w-10" title={t.workspace.browse} disabled={disabled} type="button">
+            <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M12 4v11m0 0l-4-4m4 4l4-4M5 19h14" />
+            </svg>
           </button>
-          <button onClick={() => { setEditing(true); setValue(workspaceDir ?? ''); }} className="px-1.5 py-0.5 rounded text-[10px] bg-slate-700/50 text-slate-400 hover:text-slate-200" title={t.workspace.edit} disabled={disabled}>
-            ✏️
+          <button
+            onClick={() => {
+              setEditing(true);
+              setValue(workspaceDir ?? '');
+            }}
+            className="icon-button h-10 w-10"
+            title={t.workspace.edit}
+            disabled={disabled}
+            type="button"
+          >
+            <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M15.232 5.232l3.536 3.536M9 11l6.232-6.232a2.5 2.5 0 113.536 3.536L12.536 14.536A4 4 0 019.707 15.7L7 16l.3-2.707A4 4 0 018.464 10.464L9 11z" />
+            </svg>
           </button>
         </div>
       )}
 
-      {valid === true && <span className="text-green-400 text-xs shrink-0">✓</span>}
-      {valid === false && <span className="text-red-400 text-xs shrink-0">✗ {t.workspace.invalid}</span>}
+      {valid === true && (
+        <span className="shrink-0 rounded-full border border-emerald-500/20 bg-emerald-500/10 px-2.5 py-1 text-[11px] text-emerald-300">
+          OK
+        </span>
+      )}
+      {valid === false && (
+        <span className="shrink-0 rounded-full border border-red-500/20 bg-red-500/10 px-2.5 py-1 text-[11px] text-red-300">
+          {t.workspace.invalid}
+        </span>
+      )}
     </div>
   );
 }

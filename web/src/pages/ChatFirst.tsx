@@ -12,6 +12,7 @@ import PipelineView from '../components/pipeline/PipelineView.js';
 import SubtaskList from '../components/pipeline/SubtaskList.js';
 import CostPanel from '../components/stats/CostPanel.js';
 import TimePanel from '../components/stats/TimePanel.js';
+import { useUploadStore } from '../store/upload-store.js';
 
 export default function ChatFirst() {
   const navigate = useNavigate();
@@ -122,6 +123,8 @@ export default function ChatFirst() {
 
   const handleNewSession = () => {
     close();
+    // 审计结论：重置会话时同步清理上传预览，避免输入区残留旧附件卡片。
+    useUploadStore.setState({ items: [], isUploading: false });
     reset();
     useSessionStore.getState().reset();
     setSendError(null);
@@ -143,7 +146,7 @@ export default function ChatFirst() {
         <button
           type="button"
           onClick={() => setIsMobilePanelOpen(false)}
-          className="rounded-full border border-slate-700/60 bg-slate-900/70 p-2 text-slate-400 md:hidden"
+          className="icon-button h-10 w-10 rounded-full md:hidden"
           aria-label="Close execution panel"
         >
           <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
@@ -189,7 +192,12 @@ export default function ChatFirst() {
             )}
           </>
         ) : (
-          <div className="rounded-2xl border border-slate-700/55 bg-slate-900/45 p-4 text-sm text-slate-400">
+          <div className="empty-state-card rounded-[28px] border p-5 text-sm text-slate-400">
+            <div className="mb-3 flex h-11 w-11 items-center justify-center rounded-2xl border border-purple-500/18 bg-purple-500/10 text-purple-200">
+              <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M12 6v6l4 2m4-2a8 8 0 11-16 0 8 8 0 0116 0z" />
+              </svg>
+            </div>
             {sessionId ? t.chatFirst.startTaskHint : t.chatFirst.greeting}
           </div>
         )}
@@ -239,7 +247,7 @@ export default function ChatFirst() {
         </div>
       </div>
 
-      <div className={`grid gap-4 ${isPanelOpen ? 'md:grid-cols-[minmax(0,1fr)_320px]' : 'grid-cols-1'}`}>
+      <div className={`grid gap-4 ${isPanelOpen ? 'md:grid-cols-[minmax(0,1fr)_320px]' : 'md:grid-cols-[minmax(0,1fr)_48px]'}`}>
         <div className="chat-shell stage-card flex min-h-[calc(100dvh-8rem)] flex-col overflow-hidden p-0" style={{ minHeight: '560px' }}>
           <WorkspaceSelector
             workspaceDir={workspaceDir}
@@ -250,7 +258,7 @@ export default function ChatFirst() {
           <div ref={containerRef} className="chat-scroll flex-1 overflow-y-auto py-4">
             {messages.length === 0 && !isStreaming && (
               <div className="flex justify-center px-5 py-10">
-                <div className="max-w-md text-center">
+                <div className="empty-state-card max-w-md rounded-[32px] border p-8 text-center">
                   <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-3xl border border-purple-500/15 bg-slate-900/90 shadow-lg shadow-purple-500/10">
                     <svg className="h-7 w-7 text-purple-200" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M9 3v2m6-2v2m-7 9h8m-9 5h10a2 2 0 002-2V9a2 2 0 00-2-2H7a2 2 0 00-2 2v7a2 2 0 002 2z" />
@@ -282,7 +290,7 @@ export default function ChatFirst() {
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M9 3v2m6-2v2m-8 8h10m-9 5h8a2 2 0 002-2V9a2 2 0 00-2-2H8a2 2 0 00-2 2v7a2 2 0 002 2zm-3-5h2m10 0h2" />
                   </svg>
                 </div>
-                <div className="rounded-3xl rounded-bl-lg border border-slate-700/50 border-l-2 border-l-purple-500/30 bg-slate-800/90 px-4 py-3 text-sm text-slate-300">
+                <div className="message-bubble-assistant rounded-3xl rounded-bl-lg border border-l-2 px-4 py-3 text-sm">
                   {t.chat.streaming}
                 </div>
               </div>
@@ -312,6 +320,19 @@ export default function ChatFirst() {
             {renderExecutionPanel()}
           </aside>
         )}
+
+        {!isPanelOpen && (
+          <aside className="hidden md:flex">
+            <button
+              type="button"
+              onClick={() => setIsPanelOpen(true)}
+              className="panel-surface flex h-full min-h-[560px] w-12 items-center justify-center rounded-[24px] border border-slate-700/60 text-slate-300 shadow-[0_22px_50px_rgba(2,6,23,0.24)] transition-colors hover:border-slate-600/70 hover:text-slate-100"
+              aria-label="Show execution panel"
+            >
+              <span className="[writing-mode:vertical-rl] text-[11px] uppercase tracking-[0.24em]">Execution</span>
+            </button>
+          </aside>
+        )}
       </div>
 
       <div
@@ -322,12 +343,19 @@ export default function ChatFirst() {
         aria-hidden={!isMobilePanelOpen}
       />
       <div
-        className={`panel-surface fixed inset-x-0 bottom-0 z-50 max-h-[78vh] rounded-t-[28px] border border-slate-700/60 shadow-[0_-18px_60px_rgba(2,6,23,0.45)] transition-transform duration-200 md:hidden ${
-          isMobilePanelOpen ? 'translate-y-0' : 'translate-y-full'
+        className={`drawer-shell fixed inset-x-0 bottom-0 z-50 max-h-[78vh] rounded-t-[28px] border border-slate-700/60 transition-[transform,opacity] duration-300 md:hidden ${
+          isMobilePanelOpen ? 'translate-y-0 opacity-100' : 'translate-y-[104%] opacity-0'
         }`}
         aria-hidden={!isMobilePanelOpen}
       >
-        <div className="mx-auto mt-3 h-1.5 w-12 rounded-full bg-slate-700/80" />
+        <button
+          type="button"
+          onClick={() => setIsMobilePanelOpen(false)}
+          className="mx-auto mt-3 flex w-full items-center justify-center pb-2"
+          aria-label="Close execution panel"
+        >
+          <span className="drawer-handle h-1.5 w-14 rounded-full" />
+        </button>
         {renderExecutionPanel()}
       </div>
     </div>

@@ -3,10 +3,25 @@
 @layer base {
   :root {
     --chat-bg: #020617;
+    --chat-bg-elevated: rgba(15, 23, 42, 0.92);
     --panel-bg: #172033;
+    --panel-bg-elevated: rgba(23, 32, 51, 0.92);
+    --surface: rgba(15, 23, 42, 0.78);
+    --surface-strong: rgba(15, 23, 42, 0.92);
+    --surface-soft: rgba(30, 41, 59, 0.68);
+    --surface-border: rgba(148, 163, 184, 0.22);
+    --surface-border-strong: rgba(148, 163, 184, 0.32);
+    --text-primary: #e2e8f0;
+    --text-secondary: #94a3b8;
+    --text-muted: #64748b;
     --accent: #a855f7;
+    --accent-soft: rgba(168, 85, 247, 0.12);
+    --accent-strong: #c084fc;
     --success: #10b981;
     --danger: #ef4444;
+    --shadow-elevated: 0 22px 50px rgba(2, 6, 23, 0.28);
+    --scrollbar-thumb: rgba(100, 116, 139, 0.32);
+    --scrollbar-thumb-hover: rgba(148, 163, 184, 0.44);
     --color-pending: #94a3b8;
     --color-running: #60a5fa;
     --color-completed: #34d399;
@@ -43,6 +58,23 @@
   .light body,
   .light {
     background: linear-gradient(180deg, #f8fafc 0%, #e2e8f0 100%);
+    --chat-bg: #eff6ff;
+    --chat-bg-elevated: rgba(255, 255, 255, 0.95);
+    --panel-bg: #e2e8f0;
+    --panel-bg-elevated: rgba(255, 255, 255, 0.94);
+    --surface: rgba(255, 255, 255, 0.82);
+    --surface-strong: rgba(255, 255, 255, 0.95);
+    --surface-soft: rgba(248, 250, 252, 0.96);
+    --surface-border: rgba(148, 163, 184, 0.3);
+    --surface-border-strong: rgba(100, 116, 139, 0.34);
+    --text-primary: #0f172a;
+    --text-secondary: #475569;
+    --text-muted: #64748b;
+    --accent-soft: rgba(124, 58, 237, 0.1);
+    --accent-strong: #7c3aed;
+    --shadow-elevated: 0 18px 40px rgba(148, 163, 184, 0.22);
+    --scrollbar-thumb: rgba(148, 163, 184, 0.5);
+    --scrollbar-thumb-hover: rgba(100, 116, 139, 0.58);
   }
 
   .light .bg-grid {
@@ -101,7 +133,7 @@
 
   .stage-card {
     @apply relative rounded-2xl border border-slate-700/60 bg-slate-900/55 backdrop-blur-xl p-6 transition-colors duration-200;
-    box-shadow: 0 22px 50px rgba(2, 6, 23, 0.28);
+    box-shadow: var(--shadow-elevated);
   }
 
   .stage-card:hover {
@@ -119,18 +151,81 @@
 
   .chat-shell {
     background:
-      linear-gradient(180deg, rgba(15, 23, 42, 0.96), rgba(2, 6, 23, 0.94)),
-      rgba(2, 6, 23, 0.88);
+      linear-gradient(180deg, color-mix(in srgb, var(--chat-bg-elevated) 96%, transparent), color-mix(in srgb, var(--chat-bg) 92%, transparent)),
+      color-mix(in srgb, var(--chat-bg) 88%, transparent);
   }
 
   .panel-surface {
     background:
-      linear-gradient(180deg, rgba(23, 32, 51, 0.92), rgba(15, 23, 42, 0.88)),
-      rgba(23, 32, 51, 0.88);
+      linear-gradient(180deg, color-mix(in srgb, var(--panel-bg-elevated) 100%, transparent), color-mix(in srgb, var(--chat-bg-elevated) 95%, transparent)),
+      color-mix(in srgb, var(--panel-bg) 88%, transparent);
   }
 
   .panel-badge {
     @apply inline-flex items-center rounded-full border border-purple-500/20 bg-purple-500/12 px-2.5 py-1 text-[11px] font-medium text-purple-200;
+  }
+
+  .surface-outline {
+    border-color: var(--surface-border);
+    background: var(--surface);
+  }
+
+  .surface-outline-strong {
+    border-color: var(--surface-border-strong);
+    background: var(--surface-strong);
+  }
+
+  .icon-button {
+    @apply inline-flex items-center justify-center rounded-2xl border transition-colors duration-200;
+    border-color: var(--surface-border);
+    background: color-mix(in srgb, var(--surface-strong) 90%, transparent);
+    color: var(--text-secondary);
+  }
+
+  .icon-button:hover {
+    border-color: color-mix(in srgb, var(--accent) 32%, var(--surface-border));
+    color: var(--accent-strong);
+  }
+
+  .icon-button:disabled {
+    @apply cursor-not-allowed opacity-40;
+  }
+
+  .message-bubble-assistant {
+    border-color: var(--surface-border);
+    border-left-color: color-mix(in srgb, var(--accent) 30%, transparent);
+    background: color-mix(in srgb, var(--surface-strong) 96%, transparent);
+    color: var(--text-primary);
+  }
+
+  .message-bubble-user {
+    border-color: color-mix(in srgb, #2563eb 24%, transparent);
+    background: color-mix(in srgb, #2563eb 28%, var(--surface-soft));
+    color: #eff6ff;
+  }
+
+  .empty-state-card {
+    border-color: color-mix(in srgb, var(--accent) 18%, var(--surface-border));
+    background:
+      radial-gradient(circle at top, color-mix(in srgb, var(--accent) 10%, transparent), transparent 55%),
+      color-mix(in srgb, var(--surface-strong) 96%, transparent);
+    box-shadow: var(--shadow-elevated);
+  }
+
+  .workspace-shell {
+    border-bottom-color: var(--surface-border);
+    background:
+      linear-gradient(180deg, color-mix(in srgb, var(--surface-strong) 96%, transparent), color-mix(in srgb, var(--surface) 94%, transparent));
+  }
+
+  .drawer-shell {
+    background:
+      linear-gradient(180deg, color-mix(in srgb, var(--panel-bg-elevated) 100%, transparent), color-mix(in srgb, var(--panel-bg) 88%, transparent));
+    box-shadow: 0 -18px 60px rgba(2, 6, 23, 0.45);
+  }
+
+  .drawer-handle {
+    background: linear-gradient(90deg, color-mix(in srgb, var(--surface-border) 70%, transparent), color-mix(in srgb, var(--accent) 28%, transparent), color-mix(in srgb, var(--surface-border) 70%, transparent));
   }
 }
 
@@ -154,21 +249,29 @@
 }
 
 .chat-scroll::-webkit-scrollbar-thumb {
-  background: rgba(100, 116, 139, 0.28);
+  background: var(--scrollbar-thumb);
   border-radius: 9999px;
 }
 
 .chat-scroll::-webkit-scrollbar-thumb:hover {
-  background: rgba(148, 163, 184, 0.38);
+  background: var(--scrollbar-thumb-hover);
+}
+
+.chat-scroll {
+  scrollbar-color: var(--scrollbar-thumb) transparent;
+  scrollbar-width: thin;
 }
 
 .file-card {
-  @apply flex min-w-0 items-center gap-3 rounded-2xl border border-slate-700/50 bg-slate-900/72 px-3 py-2 text-left transition-colors duration-200;
+  @apply flex min-h-[72px] min-w-0 items-center gap-3 rounded-[22px] border px-3 py-2.5 text-left transition-colors duration-200;
+  border-color: var(--surface-border);
+  background: color-mix(in srgb, var(--surface-strong) 94%, transparent);
   box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.02);
 }
 
 .file-card:hover {
-  @apply border-slate-600/65 bg-slate-900/84;
+  border-color: var(--surface-border-strong);
+  background: color-mix(in srgb, var(--surface-strong) 98%, transparent);
 }
 
 .drag-overlay {
@@ -181,6 +284,10 @@
 .lightbox-backdrop {
   @apply fixed inset-0 z-50 flex items-center justify-center bg-slate-950/90 px-4 py-4 backdrop-blur-sm;
   animation: fadeIn 0.18s ease-out;
+}
+
+.light .lightbox-backdrop {
+  background: rgba(15, 23, 42, 0.78);
 }
 
 .streaming-cursor::after {
@@ -200,11 +307,22 @@
   }
 }
 
+@media (max-width: 1023px) {
+  .chat-scroll::-webkit-scrollbar {
+    width: 6px;
+    height: 6px;
+  }
+}
+
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after {
     animation-duration: 0.01ms !important;
     animation-iteration-count: 1 !important;
     scroll-behavior: auto !important;
     transition-duration: 0.01ms !important;
+  }
+
+  .lightbox-backdrop {
+    animation: none;
   }
 }

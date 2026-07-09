@@ -212,13 +212,13 @@ export default function ChatInput({ onSend, isDisabled, sessionId }: ChatInputPr
         </div>
       )}
 
-      <div className="flex items-end gap-2 rounded-[28px] border border-slate-700/55 bg-slate-900/80 p-2 shadow-[0_-8px_30px_rgba(2,6,23,0.28)]">
+      <div className="surface-outline-strong flex items-end gap-2 rounded-[30px] border p-2 shadow-[0_-8px_30px_rgba(2,6,23,0.28)]">
         <div className="flex shrink-0 items-center gap-2">
           <button
             type="button"
             onClick={handleFileButtonClick}
             disabled={isDisabled || !isOnline}
-            className="inline-flex h-10 w-10 items-center justify-center rounded-2xl border border-slate-700/55 bg-slate-800/70 text-slate-400 transition-colors hover:border-purple-500/35 hover:text-purple-200 disabled:cursor-not-allowed disabled:opacity-40"
+            className="icon-button h-10 w-10"
             title={t.upload?.addFile ?? 'Add file'}
             aria-label={t.upload?.addFile ?? 'Add file'}
           >
@@ -231,7 +231,7 @@ export default function ChatInput({ onSend, isDisabled, sessionId }: ChatInputPr
             type="button"
             onClick={handleCameraButtonClick}
             disabled={isDisabled || !isOnline}
-            className="inline-flex h-10 w-10 items-center justify-center rounded-2xl border border-slate-700/55 bg-slate-800/70 text-slate-400 transition-colors hover:border-purple-500/35 hover:text-purple-200 disabled:cursor-not-allowed disabled:opacity-40 md:hidden"
+            className="icon-button h-10 w-10 md:hidden"
             title="Camera"
             aria-label="Camera"
           >
@@ -275,7 +275,7 @@ export default function ChatInput({ onSend, isDisabled, sessionId }: ChatInputPr
         <button
           onClick={handleSend}
           disabled={hasUploading || (!text.trim() && readyIds.length === 0) || isDisabled}
-          className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-purple-500 text-white transition-colors hover:bg-purple-400 disabled:cursor-not-allowed disabled:opacity-40"
+          className="inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-purple-500 text-white shadow-[0_8px_22px_rgba(168,85,247,0.3)] transition-colors hover:bg-purple-400 disabled:cursor-not-allowed disabled:opacity-40"
           title={t.chat.send}
           aria-label={t.chat.send}
         >
