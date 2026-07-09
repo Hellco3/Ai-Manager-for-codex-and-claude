@@ -17,6 +17,49 @@ describe('SessionStore', () => {
     const updated = sessionStore.get(session.sessionId)!;
     expect(updated.status).toBe('executing');
   });
+
+  it('upserts costStats by model (not duplicate push)', async () => {
+    const { sessionStore } = await import('../store/session-store.js');
+    const session = sessionStore.create('cost test', 'auto');
+
+    // First entry for model A
+    sessionStore.upsertCostStats(session.sessionId, {
+      model: 'claude-sonnet-5',
+      inputTokens: 1000,
+      outputTokens: 500,
+      costUSD: 0.02,
+      durationMs: 2000,
+    });
+    expect(session.costStats).toHaveLength(1);
+    expect(session.costStats[0].inputTokens).toBe(1000);
+
+    // Second entry for same model — should update, not push
+    sessionStore.upsertCostStats(session.sessionId, {
+      model: 'claude-sonnet-5',
+      inputTokens: 2500,
+      outputTokens: 1200,
+      costUSD: 0.05,
+      durationMs: 5000,
+    });
+    expect(session.costStats).toHaveLength(1);
+    expect(session.costStats[0].inputTokens).toBe(2500);
+
+    // Different model — should push
+    sessionStore.upsertCostStats(session.sessionId, {
+      model: 'claude-opus-4-8',
+      inputTokens: 500,
+      outputTokens: 200,
+      costUSD: 0.01,
+      durationMs: 800,
+    });
+    expect(session.costStats).toHaveLength(2);
+
+    // Verify persistence round-trip: GET /api/tasks/:id must return costStats
+    const fetched = sessionStore.get(session.sessionId)!;
+    expect(fetched.costStats).toHaveLength(2);
+    expect(fetched.costStats.find(s => s.model === 'claude-sonnet-5')!.inputTokens).toBe(2500);
+    expect(fetched.costStats.find(s => s.model === 'claude-opus-4-8')!.costUSD).toBe(0.01);
+  });
 });
 
 describe('TaskQueue', () => {

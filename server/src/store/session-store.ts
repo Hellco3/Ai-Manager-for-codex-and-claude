@@ -238,6 +238,25 @@ export class SessionStore {
     return session;
   }
 
+  /**
+   * Add or update cost stats, keyed by model name.
+   * Unlike addCostStats (which blindly pushes), this prevents duplicate/accumulated
+   * entries for the same model when cost updates arrive from multiple stages.
+   */
+  upsertCostStats(sessionId: string, stats: CostStats): SessionState | undefined {
+    const session = this.sessions.get(sessionId);
+    if (!session) return undefined;
+    const idx = session.costStats.findIndex(s => s.model === stats.model);
+    if (idx >= 0) {
+      session.costStats[idx] = stats;
+    } else {
+      session.costStats.push(stats);
+    }
+    session.updatedAt = Date.now();
+    this.markDirty();
+    return session;
+  }
+
   addCostStats(sessionId: string, stats: CostStats): SessionState | undefined {
     const session = this.sessions.get(sessionId);
     if (!session) return undefined;

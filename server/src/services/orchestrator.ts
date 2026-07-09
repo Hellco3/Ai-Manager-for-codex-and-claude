@@ -100,6 +100,7 @@ class Orchestrator {
     // Track cost
     const stats = costTracker.addEntry(config.DECOMPOSER_MODEL, inputTokens, outputTokens, 0);
     sseManager.broadcast(sessionId, { type: 'cost:update', stats });
+    sessionStore.upsertCostStats(sessionId, stats);
 
     // Notify: stage completed
     this.broadcastStage(sessionId, 'stage:completed', 'decompose');
@@ -309,6 +310,7 @@ class Orchestrator {
           const executorModel = actualExecutor === 'codex' ? 'codex-cli' : config.EXECUTOR_MODEL;
           const stats = costTracker.addEntry(executorModel, execResult.inputTokens, execResult.outputTokens, durationMs);
           sseManager.broadcast(sessionId, { type: 'cost:update', stats });
+          sessionStore.upsertCostStats(sessionId, stats);
         } catch (error: any) {
           if (error.name === 'AbortError') throw error;
 
@@ -469,6 +471,7 @@ class Orchestrator {
 
       const stats = costTracker.addEntry(config.DECOMPOSER_MODEL, inputTokens, outputTokens, 0);
       sseManager.broadcast(sessionId, { type: 'cost:update', stats });
+      sessionStore.upsertCostStats(sessionId, stats);
       this.broadcastStage(sessionId, 'stage:completed', 'decompose');
 
       // Notify chat about new plan
@@ -720,6 +723,7 @@ class Orchestrator {
 
       const stats = costTracker.addEntry(config.DECOMPOSER_MODEL, inputTokens, outputTokens, 0);
       sseManager.broadcast(sessionId, { type: 'cost:update', stats });
+      sessionStore.upsertCostStats(sessionId, stats);
 
       await this.runExecuteStage(sessionId, costTracker, abortController.signal);
       await this.runAggregateStage(sessionId, costTracker);
@@ -833,6 +837,7 @@ class Orchestrator {
 
       const stats = costTracker.addEntry(config.DECOMPOSER_MODEL, inputTokens, outputTokens, 0);
       sseManager.broadcast(sessionId, { type: 'cost:update', stats });
+      sessionStore.upsertCostStats(sessionId, stats);
 
       // Notify chat about the plan
       const planSummary = decomposition.overview +
