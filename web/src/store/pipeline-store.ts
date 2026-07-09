@@ -52,6 +52,7 @@ interface PipelineStore {
   appendStreamingChunk: (chunk: string) => void;
   commitStreamingMessage: (role: string, timestamp: number) => void;
   clearStreamingState: () => void;
+  upsertAttachments: (attachments: Array<{ id: string } & Record<string, any>>) => void;
 }
 
 const DEFAULT_STAGES: Record<string, StageEntry> = {
@@ -184,6 +185,16 @@ function getCurrentStage(session: SessionState): string | null {
   }
 }
 
+function normalizeAttachments(
+  attachments: SessionState['attachments'] | Array<Record<string, any>> | undefined,
+): Record<string, any> {
+  if (!attachments) return {};
+  if (Array.isArray(attachments)) {
+    return Object.fromEntries(attachments.map((attachment) => [attachment.id, attachment]));
+  }
+  return attachments;
+}
+
 export const usePipelineStore = create<PipelineStore>((set, get) => ({
   stages: createDefaultStages(),
   subtasks: {},
@@ -248,7 +259,7 @@ export const usePipelineStore = create<PipelineStore>((set, get) => ({
       streamingContent: '',
       isChatPhase: session.status === 'chatting',
       workspaceDir: (session as any).workspaceDir ?? null,
-      attachmentsById: (session as any).attachments ?? {},
+      attachmentsById: normalizeAttachments((session as any).attachments),
     });
   },
 
@@ -572,4 +583,11 @@ export const usePipelineStore = create<PipelineStore>((set, get) => ({
   }),
 
   clearStreamingState: () => set({ isStreaming: false, streamingContent: '' }),
+
+  upsertAttachments: (attachments) => set((s) => ({
+    attachmentsById: {
+      ...s.attachmentsById,
+      ...Object.fromEntries(attachments.map((attachment) => [attachment.id, attachment])),
+    },
+  })),
 }));

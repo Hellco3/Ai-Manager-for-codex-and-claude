@@ -1,5 +1,6 @@
 import { create } from 'zustand';
 import { uploadFiles, type FileAttachment } from '../api/upload.js';
+import { usePipelineStore } from './pipeline-store.js';
 
 export type UploadStatus = 'queued' | 'uploading' | 'ready' | 'failed';
 
@@ -10,6 +11,7 @@ export interface UploadItem {
   attachment: FileAttachment | null;
   error: string | null;
   progress: number; // 0-100
+  previewUrl: string | null;
 }
 
 interface UploadStore {
@@ -17,6 +19,8 @@ interface UploadStore {
   isUploading: boolean;
 
   enqueue: (files: File[], sessionId: string) => Promise<FileAttachment[]>;
+  stageFiles: (files: File[]) => void;
+  uploadStaged: (sessionId: string) => Promise<FileAttachment[]>;
   removeItem: (id: string) => void;
   clearReady: () => void;
   cancelAll: () => void;
@@ -37,13 +41,14 @@ export const useUploadStore = create<UploadStore>((set, get) => ({
       attachment: null,
       error: null,
       progress: 0,
+      previewUrl: file.type.startsWith('image/') ? URL.createObjectURL(file) : null,
     }));
 
     set((s) => ({ items: [...s.items, ...items], isUploading: true }));
 
     try {
       const attachments = await uploadFiles(files, sessionId);
-      const successIds = new Set(attachments.map((a) => a.originalName));
+      usePipelineStore.getState().upsertAttachments(attachments);
 
       set((s) => ({
         items: s.items.map((item) => {
@@ -80,7 +85,80 @@ export const useUploadStore = create<UploadStore>((set, get) => ({
     }
   },
 
+  stageFiles: (files: File[]) => {
+    const items: UploadItem[] = files.map((file) => ({
+      id: `upload-${++idCounter}`,
+      file,
+      status: 'ready',
+      attachment: null,
+      error: null,
+      progress: 100,
+      previewUrl: file.type.startsWith('image/') ? URL.createObjectURL(file) : null,
+    }));
+
+    set((s) => ({ items: [...s.items, ...items] }));
+  },
+
+  uploadStaged: async (sessionId: string) => {
+    const stagedItems = get().items.filter((item) => item.status === 'ready' && !item.attachment);
+    if (stagedItems.length === 0) {
+      return [];
+    }
+
+    set((s) => ({
+      items: s.items.map((item) =>
+        stagedItems.some((staged) => staged.id === item.id)
+          ? { ...item, status: 'uploading' as UploadStatus, progress: 0, error: null }
+          : item,
+      ),
+      isUploading: true,
+    }));
+
+    try {
+      const attachments = await uploadFiles(stagedItems.map((item) => item.file), sessionId);
+      usePipelineStore.getState().upsertAttachments(attachments);
+
+      set((s) => ({
+        items: s.items.map((item) => {
+          const staged = stagedItems.find((candidate) => candidate.id === item.id);
+          if (!staged) {
+            return item;
+          }
+
+          const match = attachments.find((attachment) => attachment.originalName === staged.file.name);
+          if (!match) {
+            return { ...item, status: 'failed' as UploadStatus, error: 'Upload failed', progress: 0 };
+          }
+
+          return {
+            ...item,
+            status: 'ready' as UploadStatus,
+            attachment: match,
+            progress: 100,
+          };
+        }),
+        isUploading: false,
+      }));
+
+      return attachments;
+    } catch (err: any) {
+      set((s) => ({
+        items: s.items.map((item) =>
+          stagedItems.some((staged) => staged.id === item.id)
+            ? { ...item, status: 'failed' as UploadStatus, error: err.message || 'Upload error', progress: 0 }
+            : item,
+        ),
+        isUploading: false,
+      }));
+      throw err;
+    }
+  },
+
   removeItem: (id: string) => {
+    const item = get().items.find((entry) => entry.id === id);
+    if (item?.previewUrl) {
+      URL.revokeObjectURL(item.previewUrl);
+    }
     set((s) => ({
       items: s.items.filter((item) => item.id !== id),
       isUploading: s.items.length <= 1 && s.isUploading ? false : s.isUploading,
@@ -88,6 +166,11 @@ export const useUploadStore = create<UploadStore>((set, get) => ({
   },
 
   clearReady: () => {
+    get().items.forEach((item) => {
+      if (item.status === 'ready' && item.previewUrl) {
+        URL.revokeObjectURL(item.previewUrl);
+      }
+    });
     set((s) => ({
       items: s.items.filter((item) => item.status !== 'ready'),
     }));

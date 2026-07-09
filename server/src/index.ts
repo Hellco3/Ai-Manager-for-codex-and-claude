@@ -1,7 +1,7 @@
 import express, { type Request, type Response, type NextFunction } from 'express';
 import cors from 'cors';
 import crypto from 'crypto';
-import rateLimit from 'express-rate-limit';
+import rateLimit, { ipKeyGenerator } from 'express-rate-limit';
 import { config, validateConfig } from './config.js';
 import { logger } from './utils/logger.js';
 import taskRoutes from './routes/tasks.js';
@@ -31,7 +31,7 @@ export function createApp() {
     max: 20,
     standardHeaders: true,
     legacyHeaders: false,
-    keyGenerator: (req) => `${req.ip}:${req.header('x-session-id') ?? 'anon'}`,
+    keyGenerator: (req) => `${ipKeyGenerator(req.ip ?? '')}:${req.header('x-session-id') ?? 'anon'}`,
     message: { error: 'Upload rate limit exceeded' },
   });
   app.use('/api/uploads', uploadLimiter);

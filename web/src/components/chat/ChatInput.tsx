@@ -4,7 +4,7 @@ import { useUploadStore } from '../../store/upload-store.js';
 import FilePreview from './FilePreview.jsx';
 
 interface ChatInputProps {
-  onSend: (message: string, attachmentIds: string[]) => void;
+  onSend: (message: string, attachmentIds: string[]) => Promise<boolean>;
   isDisabled: boolean;
   sessionId: string | null;
 }
@@ -17,7 +17,7 @@ export default function ChatInput({ onSend, isDisabled, sessionId }: ChatInputPr
   const cameraInputRef = useRef<HTMLInputElement>(null);
   const dragCounterRef = useRef(0);
 
-  const { items, enqueue, removeItem, clearReady, retryItem } = useUploadStore();
+  const { items, enqueue, stageFiles, removeItem, clearReady, retryItem } = useUploadStore();
 
   const autoResize = useCallback(() => {
     const el = textareaRef.current;
@@ -46,37 +46,44 @@ export default function ChatInput({ onSend, isDisabled, sessionId }: ChatInputPr
   const readyIds = items
     .filter((item) => item.status === 'ready' && item.attachment)
     .map((item) => item.attachment!.id);
+  const hasReadyItems = items.some((item) => item.status === 'ready');
 
   const hasUploading = items.some((item) => item.status === 'queued' || item.status === 'uploading');
 
-  const handleSend = () => {
+  const handleSend = async () => {
     const trimmed = text.trim();
     if (isDisabled || hasUploading) return;
-    if (!trimmed && readyIds.length === 0) return;
-    onSend(trimmed, readyIds);
-    setText('');
-    clearReady();
-    if (textareaRef.current) {
-      textareaRef.current.style.height = 'auto';
+    if (!trimmed && !hasReadyItems) return;
+    const sent = await onSend(trimmed, readyIds);
+    if (sent) {
+      setText('');
+      clearReady();
+      if (textareaRef.current) {
+        textareaRef.current.style.height = 'auto';
+      }
     }
   };
 
   const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
     if (e.key === 'Enter' && !e.shiftKey) {
       e.preventDefault();
-      handleSend();
+      void handleSend();
     }
   };
 
   const acceptFiles = useCallback(
     async (files: File[]) => {
-      if (!sessionId || files.length === 0) return;
+      if (files.length === 0) return;
+      if (!sessionId) {
+        stageFiles(files);
+        return;
+      }
       try {
         await enqueue(files, sessionId);
       } catch {
       }
     },
-    [sessionId, enqueue],
+    [sessionId, enqueue, stageFiles],
   );
 
   const handlePaste = useCallback(
@@ -205,6 +212,10 @@ export default function ChatInput({ onSend, isDisabled, sessionId }: ChatInputPr
             <FilePreview
               key={item.id}
               attachment={item.attachment ?? undefined}
+              fileName={item.file.name}
+              fileSize={item.file.size}
+              mimeType={item.file.type}
+              previewUrl={item.previewUrl}
               status="ready"
               onRemove={() => removeItem(item.id)}
             />
@@ -263,7 +274,9 @@ export default function ChatInput({ onSend, isDisabled, sessionId }: ChatInputPr
           ref={textareaRef}
           value={text}
           onChange={(e) => setText(e.target.value)}
-          onKeyDown={handleKeyDown}
+          onKeyDown={(e) => {
+            void handleKeyDown(e);
+          }}
           onPaste={handlePaste}
           placeholder={t.chat.placeholder}
           rows={1}
@@ -273,8 +286,10 @@ export default function ChatInput({ onSend, isDisabled, sessionId }: ChatInputPr
         />
 
         <button
-          onClick={handleSend}
-          disabled={hasUploading || (!text.trim() && readyIds.length === 0) || isDisabled}
+          onClick={() => {
+            void handleSend();
+          }}
+          disabled={hasUploading || (!text.trim() && !hasReadyItems) || isDisabled}
           className="inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-purple-500 text-white shadow-[0_8px_22px_rgba(168,85,247,0.3)] transition-colors hover:bg-purple-400 disabled:cursor-not-allowed disabled:opacity-40"
           title={t.chat.send}
           aria-label={t.chat.send}

@@ -48,10 +48,12 @@ export default function ChatPanel({ sessionId, variant = 'inline', isOpen, onClo
 
     try {
       await sendMessage(sessionId, message, attachmentIds.length > 0 ? attachmentIds : undefined);
+      return true;
     } catch (err: any) {
       setSendError(err.message || t.chat.error);
       // Rollback the optimistically added message on failure
       removeLastUserMessage();
+      return false;
     } finally {
       setIsSending(false);
     }

@@ -24,11 +24,12 @@ export async function postTask(
   task: string,
   mode: 'auto' | 'semi-auto' | 'chat-first',
   workspaceDir?: string,
+  deferInitialMessage = false,
 ): Promise<{ sessionId: string; status: string; workspaceDir?: string | null }> {
   const res = await fetch(`${BASE_URL}/tasks`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ task, mode, workspaceDir }),
+    body: JSON.stringify({ task, mode, workspaceDir, deferInitialMessage }),
   });
   if (!res.ok) {
     throw await parseError(res);

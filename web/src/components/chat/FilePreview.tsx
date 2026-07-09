@@ -10,6 +10,7 @@ interface FilePreviewProps {
   mimeType?: string;
   status?: 'queued' | 'uploading' | 'ready' | 'failed';
   progress?: number;
+  previewUrl?: string | null;
   onRemove?: () => void;
   onRetry?: () => void;
 }
@@ -36,6 +37,7 @@ export default function FilePreview({
   mimeType,
   status = 'ready',
   progress = 0,
+  previewUrl,
   onRemove,
   onRetry,
 }: FilePreviewProps) {
@@ -48,6 +50,7 @@ export default function FilePreview({
   const size = attachment?.size ?? fileSize ?? 0;
   const mime = attachment?.mimeType ?? mimeType ?? 'application/octet-stream';
   const isImage = mime.startsWith('image/');
+  const imageSrc = attachment ? getUploadUrl(attachment.storageKey) : previewUrl ?? undefined;
 
   const openLightbox = useCallback(() => {
     if (isImage && attachment) {
@@ -217,7 +220,7 @@ export default function FilePreview({
           </motion.div>
         )}
 
-        {status === 'ready' && isImage && attachment && (
+        {status === 'ready' && isImage && imageSrc && (
           <motion.div key={`${name}-image`} {...cardMotion} className="relative shrink-0">
             <button
               type="button"
@@ -226,11 +229,7 @@ export default function FilePreview({
               onKeyDown={handlePreviewKeyDown}
               aria-label={`Preview ${name}`}
             >
-              <img
-                src={getUploadUrl(attachment.storageKey)}
-                alt={name}
-                className="h-14 w-14 rounded-2xl border border-slate-700/60 object-cover"
-              />
+              <img src={imageSrc} alt={name} className="h-14 w-14 rounded-2xl border border-slate-700/60 object-cover" />
               <div className="min-w-0 flex-1 text-left">
                 <p className="truncate text-xs font-medium text-slate-200">{name}</p>
                 <p className="text-[11px] text-slate-500">Image · {formatSize(size)}</p>
@@ -251,7 +250,7 @@ export default function FilePreview({
           </motion.div>
         )}
 
-        {status === 'ready' && (!isImage || !attachment) && (
+        {status === 'ready' && (!isImage || !imageSrc) && (
           <motion.div key={`${name}-file`} {...cardMotion} className="relative shrink-0">
             <div className="file-card min-w-[220px]">
               <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl border border-slate-700/60 bg-slate-800/75 text-[11px] font-semibold tracking-[0.12em] text-slate-300">
@@ -290,7 +289,7 @@ export default function FilePreview({
       </AnimatePresence>
 
       <AnimatePresence>
-        {lightboxOpen && attachment && (
+        {lightboxOpen && attachment && imageSrc && (
           <motion.div
             {...lightboxMotion}
             className="lightbox-backdrop cursor-default md:cursor-zoom-out"
@@ -310,11 +309,7 @@ export default function FilePreview({
               onClick={(e) => e.stopPropagation()}
               ref={dialogRef}
             >
-              <img
-                src={getUploadUrl(attachment.storageKey)}
-                alt={name}
-                className="h-full w-full object-contain md:max-h-[90vh] md:max-w-[90vw]"
-              />
+              <img src={imageSrc} alt={name} className="h-full w-full object-contain md:max-h-[90vh] md:max-w-[90vw]" />
               <button
                 ref={closeButtonRef}
                 type="button"

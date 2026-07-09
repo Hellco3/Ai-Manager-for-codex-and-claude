@@ -24,7 +24,7 @@ router.post('/tasks', async (req: Request, res: Response) => {
       return;
     }
 
-    const { task, mode, workspaceDir } = req.body;
+    const { task, mode, workspaceDir, deferInitialMessage } = req.body;
     if (!task || typeof task !== 'string') {
       res.status(400).json({ error: 'Invalid task submission', details: 'task is required' });
       return;
@@ -43,6 +43,10 @@ router.post('/tasks', async (req: Request, res: Response) => {
     // chat-first mode: don't decompose immediately, go to chatting phase
     if (safeMode === 'chat-first') {
       res.json({ sessionId: session.sessionId, status: 'chatting', workspaceDir: workspaceDir ?? null });
+
+      if (deferInitialMessage) {
+        return;
+      }
 
       // Store the first user message
       sessionStore.addMessage(session.sessionId, 'user', task);
@@ -85,7 +89,9 @@ router.get('/tasks/:id', (req: Request, res: Response) => {
     decomposition: session.decomposition,
     subtaskStates: session.subtaskStates,
     messages: session.messages ?? [],
-    attachments: attachmentStore.getBySession(id),
+    attachments: Object.fromEntries(
+      attachmentStore.getBySession(id).map((attachment) => [attachment.id, attachment]),
+    ),
     workspaceDir: (session as any).workspaceDir ?? null,
     costStats: session.costStats,
     createdAt: session.createdAt,

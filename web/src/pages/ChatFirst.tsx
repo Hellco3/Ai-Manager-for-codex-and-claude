@@ -78,23 +78,40 @@ export default function ChatFirst() {
 
     if (!sessionId) {
       try {
-        const result = await postTask(message, 'chat-first', workspaceDir ?? undefined);
-        setSession(result.sessionId, message, 'chat-first');
-        addUserMessage(message, attachmentIds.length > 0 ? attachmentIds : undefined);
+        const hasStagedAttachments = useUploadStore.getState().items.some(
+          (item) => item.status === 'ready' && !item.attachment,
+        );
+
+        if (hasStagedAttachments) {
+          const initialTask = message || 'Attachment message';
+          const result = await postTask(initialTask, 'chat-first', workspaceDir ?? undefined, true);
+          const uploaded = await useUploadStore.getState().uploadStaged(result.sessionId);
+          const uploadedIds = uploaded.map((attachment) => attachment.id);
+          await sendMessage(result.sessionId, message, uploadedIds.length > 0 ? uploadedIds : undefined);
+          setSession(result.sessionId, initialTask, 'chat-first');
+          addUserMessage(message, uploadedIds.length > 0 ? uploadedIds : undefined);
+        } else {
+          const result = await postTask(message, 'chat-first', workspaceDir ?? undefined);
+          setSession(result.sessionId, message, 'chat-first');
+          addUserMessage(message, attachmentIds.length > 0 ? attachmentIds : undefined);
+        }
+        return true;
       } catch (err: any) {
         setSendError(err.message || t.chat.error);
+        return false;
       } finally {
         setIsSending(false);
       }
-      return;
     }
 
     addUserMessage(message, attachmentIds.length > 0 ? attachmentIds : undefined);
     try {
       await sendMessage(sessionId, message, attachmentIds.length > 0 ? attachmentIds : undefined);
+      return true;
     } catch (err: any) {
       setSendError(err.message || t.chat.error);
       removeLastUserMessage();
+      return false;
     } finally {
       setIsSending(false);
     }
@@ -123,7 +140,7 @@ export default function ChatFirst() {
 
   const handleNewSession = () => {
     close();
-    // 审计结论：重置会话时同步清理上传预览，避免输入区残留旧附件卡片。
+    useUploadStore.getState().clearReady();
     useUploadStore.setState({ items: [], isUploading: false });
     reset();
     useSessionStore.getState().reset();
