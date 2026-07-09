@@ -174,13 +174,13 @@ export default function ChatFirst() {
 
       <div className="chat-scroll flex-1 space-y-4 overflow-y-auto px-4 py-4">
         {showConfirm && (
-          <div className="rounded-2xl border border-purple-500/18 bg-purple-500/8 p-4">
+          <div className="subtle-panel-strong rounded-2xl border p-4">
             <p className="text-sm font-medium text-slate-100">{t.chatFirst.startTask}</p>
             <p className="mt-1 text-xs leading-5 text-slate-400">{t.chatFirst.startTaskHint}</p>
             <button
               onClick={handleConfirmTask}
               disabled={isSending || isStreaming}
-              className="mt-4 inline-flex items-center rounded-2xl bg-purple-500 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-purple-400 disabled:opacity-40"
+              className="surface-chip-strong mt-4 disabled:opacity-40"
             >
               {t.chatFirst.startTask}
             </button>
@@ -189,7 +189,7 @@ export default function ChatFirst() {
 
         {hasPipelineStarted ? (
           <>
-            <div className="rounded-2xl border border-slate-700/55 bg-slate-900/55 p-4">
+            <div className="subtle-panel rounded-2xl border p-4">
               <PipelineView
                 stages={stages}
                 currentStage={currentStage}
@@ -203,14 +203,14 @@ export default function ChatFirst() {
               <TimePanel totalDurationMs={totalDurationMs} />
             </div>
             {Object.keys(subtasks).length > 0 && (
-              <div className="rounded-2xl border border-slate-700/55 bg-slate-900/55 p-4">
+              <div className="subtle-panel rounded-2xl border p-4">
                 <SubtaskList subtasks={subtasks} />
               </div>
             )}
           </>
         ) : (
           <div className="empty-state-card rounded-[28px] border p-5 text-sm text-slate-400">
-            <div className="mb-3 flex h-11 w-11 items-center justify-center rounded-2xl border border-purple-500/18 bg-purple-500/10 text-purple-200">
+            <div className="accent-icon-surface mb-3 flex h-11 w-11 items-center justify-center rounded-2xl border">
               <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M12 6v6l4 2m4-2a8 8 0 11-16 0 8 8 0 0116 0z" />
               </svg>
@@ -229,7 +229,7 @@ export default function ChatFirst() {
   );
 
   return (
-    <div className="mx-auto max-w-3xl px-3 pb-4 pt-4 md:px-5 md:pb-6">
+    <div className="mx-auto max-w-5xl px-3 pb-4 pt-4 md:px-5 md:pb-6">
       <div className="mb-4 flex items-center justify-between gap-3">
         <div>
           <div className="text-[11px] uppercase tracking-[0.18em] text-slate-500">{t.chatFirst.taskLabel}</div>
@@ -239,21 +239,21 @@ export default function ChatFirst() {
           <button
             type="button"
             onClick={() => setIsPanelOpen((open) => !open)}
-            className="hidden rounded-2xl border border-slate-700/60 bg-slate-900/70 px-3 py-2 text-xs text-slate-300 transition-colors hover:border-slate-600/70 hover:text-slate-100 md:inline-flex"
+            className="surface-chip hidden md:inline-flex"
           >
             {isPanelOpen ? 'Hide Panel' : 'Show Panel'}
           </button>
           <button
             type="button"
             onClick={() => setIsMobilePanelOpen(true)}
-            className="inline-flex rounded-2xl border border-slate-700/60 bg-slate-900/70 px-3 py-2 text-xs text-slate-300 transition-colors hover:border-slate-600/70 hover:text-slate-100 md:hidden"
+            className="surface-chip md:hidden"
           >
             Execution
           </button>
           {sessionId && (
             <button
               onClick={handleNewSession}
-              className="rounded-2xl border border-slate-700/60 bg-slate-900/70 px-3 py-2 text-xs text-slate-300 transition-colors hover:border-slate-600/70 hover:text-slate-100"
+              className="surface-chip"
             >
               + {t.progress.newTask}
             </button>
@@ -264,8 +264,8 @@ export default function ChatFirst() {
         </div>
       </div>
 
-      <div className={`grid gap-4 ${isPanelOpen ? 'md:grid-cols-[minmax(0,1fr)_320px]' : 'md:grid-cols-[minmax(0,1fr)_48px]'}`}>
-        <div className="chat-shell stage-card flex min-h-[calc(100dvh-8rem)] flex-col overflow-hidden p-0" style={{ minHeight: '560px' }}>
+      <div className={`grid gap-4 ${isPanelOpen ? 'md:grid-cols-[minmax(0,1fr)_344px]' : 'md:grid-cols-[minmax(0,1fr)_48px]'}`} style={{ height: 'calc(100dvh - 140px)' }}>
+        <div className="chat-shell stage-card flex h-full flex-col overflow-hidden p-0">
           <WorkspaceSelector
             workspaceDir={workspaceDir}
             onUpdate={handleUpdateWorkspace}
@@ -276,8 +276,8 @@ export default function ChatFirst() {
             {messages.length === 0 && !isStreaming && (
               <div className="flex justify-center px-5 py-10">
                 <div className="empty-state-card max-w-md rounded-[32px] border p-8 text-center">
-                  <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-3xl border border-purple-500/15 bg-slate-900/90 shadow-lg shadow-purple-500/10">
-                    <svg className="h-7 w-7 text-purple-200" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
+                  <div className="accent-icon-surface mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-3xl border">
+                    <svg className="h-7 w-7 text-current" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M9 3v2m6-2v2m-7 9h8m-9 5h10a2 2 0 002-2V9a2 2 0 00-2-2H7a2 2 0 00-2 2v7a2 2 0 002 2z" />
                     </svg>
                   </div>
@@ -302,8 +302,8 @@ export default function ChatFirst() {
 
             {isStreaming && !streamingContent && (
               <div className="flex items-start gap-3 px-4 py-2 md:px-5">
-                <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-2xl border border-purple-500/15 bg-slate-900/80 shadow-lg shadow-purple-500/20">
-                  <svg className="h-[18px] w-[18px] text-purple-200" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
+                <div className="accent-icon-surface flex h-9 w-9 shrink-0 items-center justify-center rounded-2xl border">
+                  <svg className="h-[18px] w-[18px] text-current" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M9 3v2m6-2v2m-8 8h10m-9 5h8a2 2 0 002-2V9a2 2 0 00-2-2H8a2 2 0 00-2 2v7a2 2 0 002 2zm-3-5h2m10 0h2" />
                   </svg>
                 </div>
@@ -333,17 +333,17 @@ export default function ChatFirst() {
         </div>
 
         {isPanelOpen && (
-          <aside className="hidden overflow-hidden rounded-[24px] border border-slate-700/60 shadow-[0_22px_50px_rgba(2,6,23,0.24)] md:block">
+          <aside className="subtle-panel hidden overflow-hidden rounded-[24px] border md:block h-full">
             {renderExecutionPanel()}
           </aside>
         )}
 
         {!isPanelOpen && (
-          <aside className="hidden md:flex">
+          <aside className="hidden md:flex h-full">
             <button
               type="button"
               onClick={() => setIsPanelOpen(true)}
-              className="panel-surface flex h-full min-h-[560px] w-12 items-center justify-center rounded-[24px] border border-slate-700/60 text-slate-300 shadow-[0_22px_50px_rgba(2,6,23,0.24)] transition-colors hover:border-slate-600/70 hover:text-slate-100"
+              className="panel-surface flex h-full min-h-[560px] w-12 items-center justify-center rounded-[24px] border text-slate-300 transition-colors hover:text-slate-100"
               aria-label="Show execution panel"
             >
               <span className="[writing-mode:vertical-rl] text-[11px] uppercase tracking-[0.24em]">Execution</span>
