@@ -397,7 +397,17 @@ export default function ChatFirst() {
         </div>
       </div>
 
-      <div className={`grid gap-4 ${isPanelOpen ? 'md:grid-cols-[minmax(0,1fr)_344px]' : 'md:grid-cols-[minmax(0,1fr)_48px]'}`} style={{ height: 'calc(100dvh - 140px)' }}>
+      {/* Grid: right panel expands from 344px to 420px when pipeline starts */}
+      <div
+        className={`grid gap-4 transition-[grid-template-columns] duration-500 ease-out ${
+          isPanelOpen
+            ? hasPipelineStarted
+              ? 'md:grid-cols-[minmax(0,1fr)_420px]'
+              : 'md:grid-cols-[minmax(0,1fr)_344px]'
+            : 'md:grid-cols-[minmax(0,1fr)_48px]'
+        }`}
+        style={{ height: 'calc(100dvh - 140px)' }}
+      >
         <div className="chat-shell stage-card flex h-full flex-col overflow-hidden p-0">
           <WorkspaceSelector
             workspaceDir={workspaceDir}
