@@ -59,6 +59,9 @@ export class SessionStore {
   private async flushToDisk(): Promise<void> {
     if (!this.persistPath || !this.dirty) return;
     try {
+      // Ensure the directory exists before writing
+      const dir = path.dirname(this.persistPath);
+      await fs.mkdir(dir, { recursive: true });
       const records = Array.from(this.sessions.values()).map((s) => ({
         ...s,
         // Exclude large progress chunks from persistence

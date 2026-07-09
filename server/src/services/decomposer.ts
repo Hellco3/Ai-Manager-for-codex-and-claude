@@ -127,6 +127,25 @@ export async function decomposeTask(userTask: string): Promise<{
     }
   }
 
+  // Normalize: fix common LLM mistakes (converting string IDs to numbers, etc.)
+  if (raw && Array.isArray(raw.subtasks)) {
+    raw.subtasks = raw.subtasks.map((st: any) => ({
+      ...st,
+      id: String(st.id ?? ''),
+      kind: String(st.kind ?? 'code'),
+      description: String(st.description ?? ''),
+      dependencies: Array.isArray(st.dependencies) ? st.dependencies.map(String) : [],
+      priority: typeof st.priority === 'number' ? st.priority : 5,
+      estimatedComplexity: ['low', 'medium', 'high'].includes(st.estimatedComplexity) ? st.estimatedComplexity : 'medium',
+    }));
+  }
+  if (raw && Array.isArray(raw.executionOrder)) {
+    raw.executionOrder = raw.executionOrder.map(String);
+  }
+  if (raw && !raw.overview) {
+    raw.overview = 'Task decomposition';
+  }
+
   // Validate against our Zod schema
   const parsed = TaskDecomposition.safeParse(raw);
   if (!parsed.success) {
