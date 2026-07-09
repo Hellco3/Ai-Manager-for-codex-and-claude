@@ -94,7 +94,7 @@ export default function TaskProgress() {
   const showChat = isComplete || messages.length > 0;
 
   return (
-    <div className="max-w-7xl mx-auto">
+    <div className="mx-auto">
       {/* Header */}
       <div className="flex items-center justify-between mb-8 flex-wrap gap-4">
         <div>
@@ -123,6 +123,23 @@ export default function TaskProgress() {
           )}
         </div>
       </div>
+
+      {/* Desktop chat toggle — shown during execution when sidebar is collapsed */}
+      {showChat && !chatOpen && (
+        <button
+          onClick={() => setChatOpen(true)}
+          className="hidden xl:flex fixed bottom-6 right-6 z-30 w-14 h-14 rounded-full bg-blue-600 text-white shadow-lg shadow-blue-500/30 items-center justify-center hover:bg-blue-500 transition-all"
+        >
+          <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 10h.01M12 10h.01M16 10h.01M9 16H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-5l-5 5v-5z" />
+          </svg>
+          {messages.filter(m => m.role === 'assistant' && !m.content?.startsWith('[DONE')).length > 0 && (
+            <span className="absolute -top-1 -right-1 w-5 h-5 rounded-full bg-red-500 text-white text-[10px] font-bold flex items-center justify-center">
+              {messages.filter(m => m.role === 'assistant' && !m.content?.startsWith('[DONE')).length}
+            </span>
+          )}
+        </button>
+      )}
 
       {/* Two-column layout */}
       <div className="flex gap-6 flex-col xl:flex-row">
@@ -167,10 +184,21 @@ export default function TaskProgress() {
           )}
         </div>
 
-        {/* Chat sidebar — desktop */}
-        {showChat && (
+        {/* Chat sidebar — desktop: shown when chat is open (user toggled) */}
+        {showChat && chatOpen && (
           <div className="hidden xl:block w-96 shrink-0">
             <div className="sticky top-24">
+              <div className="flex items-center justify-end mb-2">
+                <button
+                  onClick={() => setChatOpen(false)}
+                  className="text-slate-500 hover:text-slate-300 p-1 rounded transition-colors"
+                  title="Close chat panel"
+                >
+                  <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                  </svg>
+                </button>
+              </div>
               <ChatPanel sessionId={sessionId!} variant="inline" />
             </div>
           </div>
