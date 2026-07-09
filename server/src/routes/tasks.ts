@@ -1,5 +1,6 @@
 import { Router, Request, Response } from 'express';
 import { sessionStore } from '../store/session-store.js';
+import { attachmentStore } from '../store/attachment-store.js';
 import { sseManager } from '../sse/manager.js';
 import { logger } from '../utils/logger.js';
 import { validateConfig } from '../config.js';
@@ -84,6 +85,7 @@ router.get('/tasks/:id', (req: Request, res: Response) => {
     decomposition: session.decomposition,
     subtaskStates: session.subtaskStates,
     messages: session.messages ?? [],
+    attachments: attachmentStore.getBySession(id),
     workspaceDir: (session as any).workspaceDir ?? null,
     costStats: session.costStats,
     createdAt: session.createdAt,
@@ -150,15 +152,26 @@ router.post('/sessions/:id/message', async (req: Request, res: Response) => {
     return;
   }
 
-  const { message } = req.body;
+  const { message, attachmentIds } = req.body;
   if (!message || typeof message !== 'string' || !message.trim()) {
     res.status(400).json({ error: 'message is required' });
     return;
   }
 
+  // Validate attachment IDs belong to this session
+  const ids: string[] = Array.isArray(attachmentIds) ? attachmentIds : [];
+  if (ids.length > 0) {
+    try {
+      attachmentStore.assertAttachable(id, ids);
+    } catch (err: any) {
+      res.status(400).json({ error: err.message });
+      return;
+    }
+  }
+
   // In chat-first (chatting) mode: just have a conversation, no decomposition
   if (session.status === 'chatting') {
-    sessionStore.addMessage(id, 'user', message.trim());
+    sessionStore.addMessage(id, 'user', message.trim(), ids.length > 0 ? ids : undefined);
 
     // Broadcast user message
     sseManager.broadcast(id, {
@@ -166,11 +179,12 @@ router.post('/sessions/:id/message', async (req: Request, res: Response) => {
       content: message.trim(),
       role: 'user',
       timestamp: Date.now(),
+      attachmentIds: ids.length > 0 ? ids : undefined,
     });
 
     // Generate streaming AI reply (no decomposition)
     const { orchestrator } = await import('../services/orchestrator.js');
-    orchestrator.chatFirstPhase(id, message.trim()).catch(err => {
+    orchestrator.chatFirstPhase(id, message.trim(), ids.length > 0 ? ids : undefined).catch(err => {
       logger.error({ sessionId: id, error: err }, 'Chat reply failed');
     });
 
@@ -186,8 +200,10 @@ router.post('/sessions/:id/message', async (req: Request, res: Response) => {
     return;
   }
 
+  sessionStore.addMessage(id, 'user', message.trim(), ids.length > 0 ? ids : undefined);
+
   const { orchestrator } = await import('../services/orchestrator.js');
-  orchestrator.continueSession(id, message.trim()).catch(err => {
+  orchestrator.continueSession(id, message.trim(), ids.length > 0 ? ids : undefined).catch(err => {
     logger.error({ sessionId: id, error: err }, 'Continue session failed');
   });
 

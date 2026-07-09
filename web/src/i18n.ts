@@ -122,6 +122,17 @@ const zh = {
     default: '默认（当前目录）',
     invalid: '路径无效',
   },
+  upload: {
+    dragDrop: '拖拽文件到此处上传',
+    uploading: '上传中...',
+    remove: '移除',
+    fileTooLarge: '文件过大',
+    unsupportedType: '不支持的文件类型',
+    pasteHint: '支持粘贴图片/文件',
+    addFile: '添加文件',
+    dropHere: '释放以上传文件',
+    retry: '重试',
+  },
 };
 
 const en: typeof zh = {
@@ -246,6 +257,17 @@ const en: typeof zh = {
     save: 'Save',
     default: 'Default (current dir)',
     invalid: 'Invalid path',
+  },
+  upload: {
+    dragDrop: 'Drag files here to upload',
+    uploading: 'Uploading...',
+    remove: 'Remove',
+    fileTooLarge: 'File too large',
+    unsupportedType: 'Unsupported file type',
+    pasteHint: 'Paste images/files supported',
+    addFile: 'Add file',
+    dropHere: 'Drop to upload',
+    retry: 'Retry',
   },
 };
 

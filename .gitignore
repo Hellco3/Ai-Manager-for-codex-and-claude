@@ -8,3 +8,5 @@ web/dist/
 server/dist/
 *.tsbuildinfo
 .ccb/
+server/uploads/*
+!server/uploads/.gitkeep

@@ -18,6 +18,7 @@ interface ChatMessage {
   role: string;
   content: string;
   timestamp: number;
+  attachmentIds?: string[];
 }
 
 interface PipelineStore {
@@ -38,6 +39,7 @@ interface PipelineStore {
   streamingContent: string;
   isChatPhase: boolean;
   workspaceDir: string | null;
+  attachmentsById: Record<string, any>;
 
   applySSEEvent: (event: SSEEvent) => void;
   hydrateFromSession: (session: SessionState) => void;
@@ -45,7 +47,7 @@ interface PipelineStore {
   reset: () => void;
 
   // Chat actions
-  addUserMessage: (message: string) => void;
+  addUserMessage: (message: string, attachmentIds?: string[]) => void;
   removeLastUserMessage: () => void;
   appendStreamingChunk: (chunk: string) => void;
   commitStreamingMessage: (role: string, timestamp: number) => void;
@@ -200,6 +202,7 @@ export const usePipelineStore = create<PipelineStore>((set, get) => ({
   streamingContent: '',
   isChatPhase: false,
   workspaceDir: null,
+  attachmentsById: {},
 
   initStages: () => set({
     stages: createDefaultStages(),
@@ -217,6 +220,7 @@ export const usePipelineStore = create<PipelineStore>((set, get) => ({
     streamingContent: '',
     isChatPhase: false,
     workspaceDir: null,
+    attachmentsById: {},
   }),
 
   hydrateFromSession: (session) => {
@@ -244,6 +248,7 @@ export const usePipelineStore = create<PipelineStore>((set, get) => ({
       streamingContent: '',
       isChatPhase: session.status === 'chatting',
       workspaceDir: (session as any).workspaceDir ?? null,
+      attachmentsById: (session as any).attachments ?? {},
     });
   },
 
@@ -486,11 +491,21 @@ export const usePipelineStore = create<PipelineStore>((set, get) => ({
               role: msgEvent.role,
               content: msgEvent.content,
               timestamp: msgEvent.timestamp,
+              attachmentIds: msgEvent.attachmentIds,
             }],
           };
         });
         break;
       }
+
+      case 'attachment:updated':
+        set((s) => ({
+          attachmentsById: {
+            ...s.attachmentsById,
+            [(event as any).attachment.id]: (event as any).attachment,
+          },
+        }));
+        break;
 
       case 'heartbeat':
         break;
@@ -513,14 +528,16 @@ export const usePipelineStore = create<PipelineStore>((set, get) => ({
     streamingContent: '',
     isChatPhase: false,
     workspaceDir: null,
+    attachmentsById: {},
   }),
 
   // Chat actions
-  addUserMessage: (message) => set((s) => ({
+  addUserMessage: (message, attachmentIds) => set((s) => ({
     messages: [...s.messages, {
       role: 'user',
       content: message,
       timestamp: Date.now(),
+      attachmentIds,
     }],
   })),
 

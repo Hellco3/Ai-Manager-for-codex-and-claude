@@ -86,6 +86,23 @@ export const TaskSubmission = z.object({
 });
 export type TaskSubmission = z.infer<typeof TaskSubmission>;
 
+// --- File Attachment ---
+export const AttachmentStatus = z.enum(['uploading', 'ready', 'failed']);
+export type AttachmentStatus = z.infer<typeof AttachmentStatus>;
+
+export const FileAttachment = z.object({
+  id: z.string(),
+  sessionId: z.string(),
+  storageKey: z.string(),
+  originalName: z.string(),
+  mimeType: z.string(),
+  size: z.number().int().nonnegative(),
+  status: AttachmentStatus,
+  type: z.enum(['image', 'file']),
+  createdAt: z.number(),
+});
+export type FileAttachment = z.infer<typeof FileAttachment>;
+
 // --- Cost Stats ---
 export const CostStats = z.object({
   model: z.string(),

@@ -8,8 +8,10 @@ import {
   type SubtaskStatus,
   type Subtask,
   type CostStats,
+  type FileAttachment,
 } from '@ai_manager/shared';
 import { logger } from '../utils/logger.js';
+import { attachmentStore } from './attachment-store.js';
 
 interface StoredSession {
   sessionId: string;
@@ -18,7 +20,7 @@ interface StoredSession {
   mode: 'auto' | 'semi-auto';
   decomposition: any;
   subtaskStates: Record<string, SubtaskState>;
-  messages?: Array<{ role: string; content: string; timestamp: number }>;
+  messages?: Array<{ role: string; content: string; timestamp: number; attachmentIds?: string[] }>;
   costStats: CostStats[];
   createdAt: number;
   updatedAt: number;
@@ -83,7 +85,7 @@ export class SessionStore {
     this.dirty = true;
   }
 
-  private cleanupExpired(): void {
+  private async cleanupExpired(): Promise<void> {
     const now = Date.now();
     const maxAge = 24 * 60 * 60 * 1000; // 24 hours
     for (const [id, session] of this.sessions) {
@@ -91,6 +93,8 @@ export class SessionStore {
         (session.status === 'completed' || session.status === 'failed' || session.status === 'cancelled') &&
         now - session.updatedAt > maxAge
       ) {
+        // Clean up attachments first
+        await attachmentStore.cleanupBySession(id);
         this.sessions.delete(id);
         this.markDirty();
       }
@@ -243,11 +247,16 @@ export class SessionStore {
     return session;
   }
 
-  addMessage(sessionId: string, role: string, content: string): SessionState | undefined {
+  addMessage(sessionId: string, role: string, content: string, attachmentIds?: string[]): SessionState | undefined {
     const session = this.sessions.get(sessionId);
     if (!session) return undefined;
     if (!session.messages) session.messages = [];
-    session.messages.push({ role, content, timestamp: Date.now() });
+    const message: any = { role, content, timestamp: Date.now() };
+    if (attachmentIds && attachmentIds.length > 0) {
+      message.attachmentIds = attachmentIds;
+      attachmentStore.bindToMessage(attachmentIds, `${sessionId}:${session.messages.length}`);
+    }
+    session.messages.push(message);
     session.updatedAt = Date.now();
     this.markDirty();
     return session;

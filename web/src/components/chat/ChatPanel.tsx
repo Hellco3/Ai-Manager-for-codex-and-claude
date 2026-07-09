@@ -40,14 +40,14 @@ export default function ChatPanel({ sessionId, variant = 'inline', isOpen, onClo
     scrollToBottom();
   }, [messages, streamingContent, scrollToBottom]);
 
-  const handleSend = async (message: string) => {
+  const handleSend = async (message: string, attachmentIds: string[]) => {
     setSendError(null);
     setIsSending(true);
-    addUserMessage(message);
+    addUserMessage(message, attachmentIds.length > 0 ? attachmentIds : undefined);
     scrollToBottom(true);
 
     try {
-      await sendMessage(sessionId, message);
+      await sendMessage(sessionId, message, attachmentIds.length > 0 ? attachmentIds : undefined);
     } catch (err: any) {
       setSendError(err.message || t.chat.error);
       // Rollback the optimistically added message on failure
@@ -110,6 +110,7 @@ export default function ChatPanel({ sessionId, variant = 'inline', isOpen, onClo
             role={msg.role}
             content={msg.content}
             timestamp={msg.timestamp}
+            attachmentIds={(msg as any).attachmentIds}
           />
         ))}
 
@@ -166,7 +167,7 @@ export default function ChatPanel({ sessionId, variant = 'inline', isOpen, onClo
       )}
 
       {/* Input */}
-      <ChatInput onSend={handleSend} isDisabled={isStreaming || isSending} />
+      <ChatInput onSend={handleSend} isDisabled={isStreaming || isSending} sessionId={sessionId} />
     </div>
   );
 

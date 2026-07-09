@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { Subtask, SubtaskState, TaskDecomposition, CostStats, AggregatedResult } from './task.js';
+import { Subtask, SubtaskState, TaskDecomposition, CostStats, AggregatedResult, FileAttachment } from './task.js';
 
 // --- SSE Event Types ---
 export const SSEEventType = z.enum([
@@ -18,6 +18,7 @@ export const SSEEventType = z.enum([
   'cost:update',
   'message:chunk',
   'message:complete',
+  'attachment:updated',
   'heartbeat',
 ]);
 export type SSEEventType = z.infer<typeof SSEEventType>;
@@ -38,7 +39,8 @@ export const SSEEvent = z.discriminatedUnion('type', [
   z.object({ id: z.string().optional(), type: z.literal('session:error'), error: z.string() }),
   z.object({ id: z.string().optional(), type: z.literal('cost:update'), stats: CostStats }),
   z.object({ id: z.string().optional(), type: z.literal('message:chunk'), chunk: z.string() }),
-  z.object({ id: z.string().optional(), type: z.literal('message:complete'), content: z.string(), role: z.string(), timestamp: z.number() }),
+  z.object({ id: z.string().optional(), type: z.literal('message:complete'), content: z.string(), role: z.string(), timestamp: z.number(), attachmentIds: z.array(z.string()).optional() }),
+  z.object({ id: z.string().optional(), type: z.literal('attachment:updated'), attachment: FileAttachment }),
   z.object({ id: z.string().optional(), type: z.literal('heartbeat'), timestamp: z.number() }),
 ]);
 export type SSEEvent = z.infer<typeof SSEEvent>;
@@ -71,7 +73,9 @@ export const SessionState = z.object({
     role: z.string(),
     content: z.string(),
     timestamp: z.number(),
+    attachmentIds: z.array(z.string()).optional(),
   })).optional(),
+  attachments: z.record(z.string(), FileAttachment).optional(),
   workspaceDir: z.string().optional(),
   costStats: z.array(CostStats).default([]),
   createdAt: z.number(),

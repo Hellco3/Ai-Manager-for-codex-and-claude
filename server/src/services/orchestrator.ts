@@ -1,5 +1,6 @@
-import { type SSEEvent } from '@ai_manager/shared';
+import { type SSEEvent, type FileAttachment } from '@ai_manager/shared';
 import { sessionStore } from '../store/session-store.js';
+import { attachmentStore } from '../store/attachment-store.js';
 import { sseManager } from '../sse/manager.js';
 import { decomposeTask } from './decomposer.js';
 import { config } from '../config.js';
@@ -420,7 +421,7 @@ class Orchestrator {
   }
 
   /** Continue a session with a follow-up message */
-  async continueSession(sessionId: string, message: string): Promise<void> {
+  async continueSession(sessionId: string, message: string, attachmentIds?: string[]): Promise<void> {
     const session = sessionStore.get(sessionId);
     if (!session) return;
 
@@ -433,7 +434,7 @@ class Orchestrator {
     this.costTrackers.set(sessionId, costTracker);
 
     // Store user message (only source of truth — route handler does NOT push)
-    sessionStore.addMessage(sessionId, 'user', message);
+    sessionStore.addMessage(sessionId, 'user', message, attachmentIds);
 
     // Broadcast user message to SSE for connected clients
     sseManager.broadcast(sessionId, {
@@ -441,12 +442,13 @@ class Orchestrator {
       content: message,
       role: 'user',
       timestamp: Date.now(),
+      attachmentIds,
     });
 
     // Re-decompose with conversation context
     try {
       // Phase 1: Generate conversational AI response (streaming)
-      await this.streamChatResponse(sessionId, message, abortController.signal);
+      await this.streamChatResponse(sessionId, message, abortController.signal, attachmentIds);
 
       // Phase 2: Re-decompose
       this.broadcastStage(sessionId, 'stage:started', 'decompose');
@@ -497,11 +499,13 @@ class Orchestrator {
 
   /**
    * Generate a streaming conversational AI response via Claude.
+   * Handles image attachments as Claude-compatible content blocks.
    */
   private async streamChatResponse(
     sessionId: string,
     userMessage: string,
     signal: AbortSignal,
+    attachmentIds?: string[],
   ): Promise<void> {
     const session = sessionStore.get(sessionId)!;
     let fullResponse = '';
@@ -523,17 +527,64 @@ class Orchestrator {
           content: m.content,
         }));
 
+      // Build user message content — may include image attachments
+      let userContent: any = userMessage;
+
+      if (attachmentIds && attachmentIds.length > 0) {
+        const attachments = attachmentStore.getByIds(attachmentIds);
+        const imageAtts = attachments.filter(a => a.type === 'image' && a.status === 'ready');
+        const fileAtts = attachments.filter(a => a.type !== 'image' && a.status === 'ready');
+
+        if (imageAtts.length > 0 || fileAtts.length > 0) {
+          // Use array content format for multimodal messages
+          const contentBlocks: any[] = [];
+
+          for (const img of imageAtts) {
+            try {
+              const fs = (await import('fs/promises')).default ?? await import('fs/promises');
+              const path = (await import('node:path')).default ?? await import('node:path');
+              const UPLOAD_ROOT = path.resolve('uploads');
+              const resolved = path.resolve(UPLOAD_ROOT, img.storageKey);
+              if (resolved.startsWith(UPLOAD_ROOT + path.sep)) {
+                const imageData = await fs.readFile(resolved);
+                const base64 = imageData.toString('base64');
+                contentBlocks.push({
+                  type: 'image',
+                  source: {
+                    type: 'base64',
+                    media_type: img.mimeType,
+                    data: base64,
+                  },
+                });
+              }
+            } catch (err: any) {
+              logger.warn({ error: err, attachmentId: img.id }, 'Failed to read image attachment for Claude');
+            }
+          }
+
+          // Build text with file references
+          let textContent = userMessage;
+          if (fileAtts.length > 0) {
+            const fileList = fileAtts.map(f => `- ${f.originalName} (${f.mimeType}, ${(f.size / 1024).toFixed(1)}KB)`).join('\n');
+            textContent = `${userMessage}\n\n[用户上传了以下文件：\n${fileList}\n]`;
+          }
+
+          contentBlocks.push({ type: 'text', text: textContent });
+          userContent = contentBlocks;
+        }
+      }
+
       const stream = anthropic.messages.stream({
         model: config.EXECUTOR_MODEL,
         max_tokens: 4000,
-        system: `你是任务编排系统中的 AI 助手。用户提交的任务是：“${session.task}”。
+        system: `你是任务编排系统中的 AI 助手。用户提交的任务是：”${session.task}”。
 
 你正在围绕这个任务与用户继续对话。请简洁、友好、协作地回应，先确认用户诉求，再说明你接下来会怎么处理。你的回复后，系统会自动重新拆解并执行子任务。
 
 重要：回复尽量简短，控制在 2 到 4 句话内。默认优先使用简体中文；只有当任务明确要求其他语言时才切换。系统会负责实际执行，你只需要把话说明白。`,
         messages: [
           ...historyMessages,
-          { role: 'user' as const, content: userMessage },
+          { role: 'user' as const, content: userContent },
         ],
       });
 
@@ -639,7 +690,7 @@ class Orchestrator {
    * Chat-first phase: generate a streaming conversational AI response without decomposition.
    * Used when the user sends a message in 'chatting' mode — just talk, don't execute.
    */
-  async chatFirstPhase(sessionId: string, userMessage: string): Promise<void> {
+  async chatFirstPhase(sessionId: string, userMessage: string, attachmentIds?: string[]): Promise<void> {
     const session = sessionStore.get(sessionId);
     if (!session) return;
 
@@ -649,7 +700,7 @@ class Orchestrator {
     }
 
     try {
-      await this.streamChatResponse(sessionId, userMessage, abortController.signal);
+      await this.streamChatResponse(sessionId, userMessage, abortController.signal, attachmentIds);
     } catch (error: any) {
       if (error.name === 'AbortError') return;
       logger.error({ sessionId, error }, 'Chat-first phase failed');

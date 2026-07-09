@@ -5,6 +5,7 @@ import rateLimit from 'express-rate-limit';
 import { config, validateConfig } from './config.js';
 import { logger } from './utils/logger.js';
 import taskRoutes from './routes/tasks.js';
+import uploadRoutes from './routes/uploads.js';
 import { sessionStore } from './store/session-store.js';
 
 export function createApp() {
@@ -14,15 +15,26 @@ export function createApp() {
   app.use(cors());
   app.use(express.json({ limit: '2mb' }));
 
-  // Rate limiting: 30 requests/min per IP
-  const limiter = rateLimit({
+  // Rate limiting: 30 requests/min per IP for general API
+  const generalLimiter = rateLimit({
     windowMs: 60 * 1000,
     max: 30,
     standardHeaders: true,
     legacyHeaders: false,
     message: { error: 'Too many requests, please try again later.' },
   });
-  app.use('/api', limiter);
+  app.use('/api', generalLimiter);
+
+  // Stricter rate limiting for uploads: 20 requests/min per IP
+  const uploadLimiter = rateLimit({
+    windowMs: 60 * 1000,
+    max: 20,
+    standardHeaders: true,
+    legacyHeaders: false,
+    keyGenerator: (req) => `${req.ip}:${req.header('x-session-id') ?? 'anon'}`,
+    message: { error: 'Upload rate limit exceeded' },
+  });
+  app.use('/api/uploads', uploadLimiter);
 
   // Request logging with request ID
   app.use((req, _res, next) => {
@@ -33,6 +45,7 @@ export function createApp() {
   });
 
   // Routes
+  app.use('/api', uploadRoutes);
   app.use('/api', taskRoutes);
 
   // Health check

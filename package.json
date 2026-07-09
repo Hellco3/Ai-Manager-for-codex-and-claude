@@ -15,7 +15,13 @@
     "test:web": "npx vitest run --config web/vite.config.ts"
   },
   "devDependencies": {
+    "@types/multer": "^2.2.0",
     "concurrently": "^9.1.0",
     "typescript": "^5.7.0"
+  },
+  "dependencies": {
+    "file-type": "^22.0.1",
+    "multer": "^2.2.0",
+    "sharp": "^0.35.3"
   }
 }

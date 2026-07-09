@@ -1,4 +1,5 @@
 import type { SSEEvent, SessionState, Subtask } from '@ai_manager/shared';
+import type { FileAttachment } from './upload.js';
 
 const BASE_URL = '/api';
 
@@ -88,11 +89,12 @@ export function createSSEConnection(
 export async function sendMessage(
   sessionId: string,
   message: string,
+  attachmentIds?: string[],
 ): Promise<void> {
   const res = await fetch(`${BASE_URL}/sessions/${sessionId}/message`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ message }),
+    body: JSON.stringify({ message, attachmentIds }),
   });
   if (!res.ok) throw await parseError(res);
 }

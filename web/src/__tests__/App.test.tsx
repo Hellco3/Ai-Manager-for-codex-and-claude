@@ -12,7 +12,7 @@ describe('App', () => {
         <App />
       </BrowserRouter>,
     );
-    expect(screen.getAllByRole('heading', { level: 1 })).toHaveLength(2);
+    expect(screen.getAllByRole('heading', { level: 1 })).toHaveLength(1);
   });
 
   it('renders the i18n header', () => {
@@ -21,6 +21,6 @@ describe('App', () => {
         <App />
       </BrowserRouter>,
     );
-    expect(screen.getAllByText(t.app.title)).toHaveLength(2);
+    expect(screen.getAllByText(t.app.title)).toHaveLength(1);
   });
 });

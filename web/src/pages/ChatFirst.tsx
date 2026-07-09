@@ -68,7 +68,7 @@ export default function ChatFirst() {
 
   useEffect(() => { scrollToBottom(); }, [messages, streamingContent, scrollToBottom]);
 
-  const handleSend = async (message: string) => {
+  const handleSend = async (message: string, attachmentIds: string[]) => {
     setSendError(null);
     setIsSending(true);
     scrollToBottom(true);
@@ -78,7 +78,7 @@ export default function ChatFirst() {
       try {
         const result = await postTask(message, 'chat-first', workspaceDir ?? undefined);
         setSession(result.sessionId, message, 'chat-first');
-        addUserMessage(message);
+        addUserMessage(message, attachmentIds.length > 0 ? attachmentIds : undefined);
         // Start SSE connection by navigating (triggers useSSE)
       } catch (err: any) {
         setSendError(err.message || t.chat.error);
@@ -89,9 +89,9 @@ export default function ChatFirst() {
     }
 
     // Existing session — send message
-    addUserMessage(message);
+    addUserMessage(message, attachmentIds.length > 0 ? attachmentIds : undefined);
     try {
-      await sendMessage(sessionId, message);
+      await sendMessage(sessionId, message, attachmentIds.length > 0 ? attachmentIds : undefined);
     } catch (err: any) {
       setSendError(err.message || t.chat.error);
       removeLastUserMessage();
@@ -135,15 +135,8 @@ export default function ChatFirst() {
     <div className="max-w-4xl mx-auto">
       {/* Header */}
       <div className="flex items-center justify-between mb-4 flex-wrap gap-3">
-        <div className="flex items-center gap-3">
-          <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center">
-            <svg className="w-5 h-5 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
-            </svg>
-          </div>
-          <h1 className="text-lg font-semibold">
-            <span className="gradient-text">{t.app.title}</span>
-          </h1>
+        <div className="text-xs text-slate-500">
+          {t.chatFirst.taskLabel}
         </div>
         <div className="flex items-center gap-3">
           {sessionId && (
@@ -184,6 +177,7 @@ export default function ChatFirst() {
               role={msg.role}
               content={msg.content}
               timestamp={msg.timestamp}
+              attachmentIds={msg.attachmentIds}
             />
           ))}
 
@@ -262,7 +256,7 @@ export default function ChatFirst() {
         )}
 
         {/* Input */}
-        <ChatInput onSend={handleSend} isDisabled={isStreaming || isSending} />
+        <ChatInput onSend={handleSend} isDisabled={isStreaming || isSending} sessionId={sessionId} />
       </div>
     </div>
   );

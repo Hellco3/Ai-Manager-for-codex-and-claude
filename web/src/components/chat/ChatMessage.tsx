@@ -1,11 +1,15 @@
 import React from 'react';
 import { t } from '../../i18n.js';
+import FilePreview from './FilePreview.jsx';
+import type { FileAttachment } from '../../api/upload.js';
+import { usePipelineStore } from '../../store/pipeline-store.js';
 
 interface ChatMessageProps {
   role: string;
   content: string;
   timestamp: number;
   isStreaming?: boolean;
+  attachmentIds?: string[];
 }
 
 function formatTime(ts: number): string {
@@ -15,10 +19,17 @@ function formatTime(ts: number): string {
   return new Date(ts).toLocaleTimeString();
 }
 
-export default function ChatMessage({ role, content, timestamp, isStreaming }: ChatMessageProps) {
+export default function ChatMessage({ role, content, timestamp, isStreaming, attachmentIds }: ChatMessageProps) {
   const isUser = role === 'user';
   const isSystem = role === 'system';
   const isAssistant = role === 'assistant';
+  const attachmentsById = usePipelineStore((s) => s.attachmentsById);
+
+  const attachments: FileAttachment[] = attachmentIds
+    ? attachmentIds
+        .map((id) => attachmentsById[id])
+        .filter((a): a is FileAttachment => a != null)
+    : [];
 
   if (isSystem) {
     return (
@@ -34,7 +45,7 @@ export default function ChatMessage({ role, content, timestamp, isStreaming }: C
     <div className={`flex gap-2 px-3 py-2 ${isUser ? 'justify-end' : 'justify-start'}`}>
       {/* Avatar (assistant side) */}
       {isAssistant && (
-        <div className="w-7 h-7 rounded-lg bg-gradient-to-br from-purple-500 to-blue-600 flex items-center justify-center shrink-0 mt-0.5">
+        <div className="w-7 h-7 rounded-lg bg-gradient-to-br from-purple-500 to-blue-600 flex items-center justify-center shrink-0 mt-0.5 shadow-lg shadow-purple-500/20">
           <svg className="w-4 h-4 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
           </svg>
@@ -45,8 +56,8 @@ export default function ChatMessage({ role, content, timestamp, isStreaming }: C
         <div
           className={`rounded-2xl px-3.5 py-2.5 text-sm leading-relaxed ${
             isUser
-              ? 'bg-blue-600/30 border border-blue-500/30 text-blue-50 rounded-br-md'
-              : 'bg-slate-800/80 border border-slate-700/50 text-slate-200 rounded-bl-md'
+              ? 'bg-blue-600/20 border border-blue-400/20 text-blue-50 rounded-br-md'
+              : 'bg-slate-800/80 border border-slate-700/50 text-slate-200 rounded-bl-md border-l-2 border-l-purple-500/30'
           } ${isStreaming ? 'streaming-cursor' : ''}`}
         >
           <div className="whitespace-pre-wrap break-words">
@@ -56,6 +67,16 @@ export default function ChatMessage({ role, content, timestamp, isStreaming }: C
             )}
           </div>
         </div>
+
+        {/* File attachments */}
+        {attachments.length > 0 && (
+          <div className="flex flex-wrap gap-1.5 mt-1.5">
+            {attachments.map((att) => (
+              <FilePreview key={att.id} attachment={att} status="ready" />
+            ))}
+          </div>
+        )}
+
         <div className={`text-[10px] text-slate-600 mt-1 ${isUser ? 'text-right' : 'text-left'}`}>
           {isUser ? t.chat.user : t.chat.assistant} · {formatTime(timestamp)}
         </div>
