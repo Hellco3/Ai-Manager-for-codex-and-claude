@@ -121,6 +121,23 @@ export async function confirmTask(
   if (!res.ok) throw await parseError(res);
 }
 
+export interface SessionSummary {
+  sessionId: string;
+  status: string;
+  mode: string;
+  task: string;
+  messageCount: number;
+  createdAt: number;
+  updatedAt: number;
+  workspaceDir: string | null;
+}
+
+export async function listSessions(): Promise<SessionSummary[]> {
+  const res = await fetch(`${BASE_URL}/sessions`);
+  if (!res.ok) throw await parseError(res);
+  return res.json();
+}
+
 export async function updateWorkspace(
   sessionId: string,
   workspaceDir: string,

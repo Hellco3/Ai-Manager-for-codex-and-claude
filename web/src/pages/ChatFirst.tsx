@@ -380,7 +380,7 @@ export default function ChatFirst() {
   );
 
   return (
-    <div className="mx-auto max-w-5xl px-3 pb-4 pt-4 md:px-5 md:pb-6">
+    <div className="max-w-5xl px-3 pb-4 pt-4 md:px-5 md:pb-6">
       {/* Processing indicator */}
       {statusMessage && (
         <div className="mb-3 flex items-center gap-2 px-1">

@@ -99,6 +99,22 @@ router.get('/tasks/:id', (req: Request, res: Response) => {
   });
 });
 
+// GET /api/sessions — list all sessions (summary only)
+router.get('/sessions', (_req: Request, res: Response) => {
+  const sessions = sessionStore.getAllSessions();
+  const summaries = sessions.map((s) => ({
+    sessionId: s.sessionId,
+    status: s.status,
+    mode: s.mode,
+    task: s.task.slice(0, 100),
+    messageCount: s.messages?.length ?? 0,
+    createdAt: s.createdAt,
+    updatedAt: s.updatedAt,
+    workspaceDir: (s as any).workspaceDir ?? null,
+  }));
+  res.json(summaries);
+});
+
 // POST /api/tasks/:id/approve
 router.post('/tasks/:id/approve', async (req: Request, res: Response) => {
   const id = param(req, 'id');
