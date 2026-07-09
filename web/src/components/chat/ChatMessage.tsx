@@ -3,7 +3,6 @@ import { motion, useReducedMotion } from 'framer-motion';
 import { t } from '../../i18n.js';
 import FilePreview from './FilePreview.jsx';
 import type { FileAttachment } from '../../api/upload.js';
-import { getUploadUrl } from '../../api/upload.js';
 import { usePipelineStore } from '../../store/pipeline-store.js';
 
 interface ChatMessageProps {
@@ -21,48 +20,46 @@ function formatTime(ts: number): string {
   return new Date(ts).toLocaleTimeString();
 }
 
-// Regex to detect file paths in assistant messages — supports absolute + relative paths
 const FILE_PATH_RE = /((?:[A-Za-z]:[\\/][^\s<>"]+?\.\w{1,8})|(?:\/[^\s<>"]+?\.\w{1,8})|(?:\.?[\\/][^\s<>"]+?\.\w{1,8}))/g;
 
 function renderContent(text: string, isUser: boolean) {
+  const contentClassName = 'whitespace-pre-wrap break-words [overflow-wrap:anywhere]';
   if (isUser) {
-    return <div className="whitespace-pre-wrap break-words">{text}</div>;
+    return <div className={contentClassName}>{text}</div>;
   }
 
-  // Find file paths and convert to clickable links
   const parts: React.ReactNode[] = [];
   let lastIndex = 0;
   let match: RegExpExecArray | null;
-
   const re = new RegExp(FILE_PATH_RE.source, 'g');
+
   while ((match = re.exec(text)) !== null) {
     const path = match[1];
-    // Add text before this match
     if (match.index > lastIndex) {
       parts.push(text.slice(lastIndex, match.index));
     }
-    // Add file link
+
     const fileUrl = `file:///${path.replace(/\\/g, '/').replace(/^([A-Za-z]):\//, '$1:/')}`;
     parts.push(
       <a
         key={match.index}
         href={fileUrl}
-        className="text-purple-400 underline underline-offset-2 hover:text-purple-300 transition-colors"
+        className="text-purple-400 underline underline-offset-2 transition-colors hover:text-purple-300"
         target="_blank"
         rel="noopener noreferrer"
         title={path}
       >
-        📄 {path.split(/[\\/]/).pop() || path}
+        File: {path.split(/[\\/]/).pop() || path}
       </a>,
     );
     lastIndex = match.index + path.length;
   }
-  // Add remaining text
+
   if (lastIndex < text.length) {
     parts.push(text.slice(lastIndex));
   }
 
-  return <div className="whitespace-pre-wrap break-words">{parts.length > 0 ? parts : text}</div>;
+  return <div className={contentClassName}>{parts.length > 0 ? parts : text}</div>;
 }
 
 export default function ChatMessage({ role, content, timestamp, isStreaming, attachmentIds }: ChatMessageProps) {
@@ -74,19 +71,20 @@ export default function ChatMessage({ role, content, timestamp, isStreaming, att
 
   const attachments: FileAttachment[] = attachmentIds
     ? attachmentIds
-        .map((id) => attachmentsById[id])
-        .filter((a): a is FileAttachment => a != null)
+      .map((id) => attachmentsById[id])
+      .filter((attachment): attachment is FileAttachment => attachment != null)
     : [];
 
-  // Detect markdown image syntax: ![alt](url)
   const inlineImages = useMemo(() => {
     if (isUser) return [];
     const imgRe = /!\[([^\]]*)\]\(([^)]+)\)/g;
     const images: { alt: string; url: string }[] = [];
-    let m: RegExpExecArray | null;
-    while ((m = imgRe.exec(content)) !== null) {
-      images.push({ alt: m[1], url: m[2] });
+    let match: RegExpExecArray | null;
+
+    while ((match = imgRe.exec(content)) !== null) {
+      images.push({ alt: match[1], url: match[2] });
     }
+
     return images;
   }, [content, isUser]);
 
@@ -119,7 +117,7 @@ export default function ChatMessage({ role, content, timestamp, isStreaming, att
 
       <div className={`max-w-[88%] space-y-1.5 md:max-w-[80%] ${isUser ? 'order-first items-end' : ''}`}>
         <div
-          className={`rounded-3xl px-4 py-3 text-sm leading-6 ${
+          className={`overflow-hidden rounded-3xl px-4 py-3 text-sm leading-6 ${
             isUser
               ? 'message-bubble-user rounded-br-lg border'
               : 'message-bubble-assistant rounded-bl-lg border border-l-2'
@@ -127,12 +125,11 @@ export default function ChatMessage({ role, content, timestamp, isStreaming, att
         >
           {renderContent(content, isUser)}
 
-          {/* Inline markdown images */}
           {inlineImages.length > 0 && (
             <div className="mt-2 flex flex-wrap gap-2">
-              {inlineImages.map((img, i) => (
+              {inlineImages.map((img, index) => (
                 <img
-                  key={`inline-img-${i}`}
+                  key={`inline-img-${index}`}
                   src={img.url.startsWith('/api/uploads/') ? img.url : `/api/uploads/${encodeURIComponent(img.url)}`}
                   alt={img.alt || 'image'}
                   className="max-h-48 max-w-full rounded-xl border border-slate-700/50 object-cover"
@@ -144,8 +141,8 @@ export default function ChatMessage({ role, content, timestamp, isStreaming, att
 
         {attachments.length > 0 && (
           <div className="chat-scroll flex flex-wrap gap-2 overflow-x-auto pb-1 md:overflow-visible">
-            {attachments.map((att) => (
-              <FilePreview key={att.id} attachment={att} status="ready" />
+            {attachments.map((attachment) => (
+              <FilePreview key={attachment.id} attachment={attachment} status="ready" />
             ))}
           </div>
         )}
