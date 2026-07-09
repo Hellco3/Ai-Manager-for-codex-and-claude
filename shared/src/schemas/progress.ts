@@ -62,9 +62,9 @@ export type PipelineState = z.infer<typeof PipelineState>;
 // --- Session State ---
 export const SessionState = z.object({
   sessionId: z.string(),
-  status: z.enum(['decomposing', 'awaiting_review', 'executing', 'aggregating', 'completed', 'failed', 'cancelled', 'timed_out']),
+  status: z.enum(['chatting', 'decomposing', 'awaiting_review', 'executing', 'aggregating', 'completed', 'failed', 'cancelled', 'timed_out']),
   task: z.string(),
-  mode: z.enum(['auto', 'semi-auto']),
+  mode: z.enum(['auto', 'semi-auto', 'chat-first']),
   decomposition: TaskDecomposition.optional(),
   subtaskStates: z.record(z.string(), SubtaskState).default({}),
   messages: z.array(z.object({
@@ -72,6 +72,7 @@ export const SessionState = z.object({
     content: z.string(),
     timestamp: z.number(),
   })).optional(),
+  workspaceDir: z.string().optional(),
   costStats: z.array(CostStats).default([]),
   createdAt: z.number(),
   updatedAt: z.number(),

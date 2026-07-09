@@ -1,5 +1,6 @@
 import React, { useEffect } from 'react';
 import { Routes, Route } from 'react-router-dom';
+import ChatFirst from './pages/ChatFirst.js';
 import TaskSubmit from './pages/TaskSubmit.js';
 import TaskProgress from './pages/TaskProgress.js';
 import { useThemeStore } from './store/theme-store.js';
@@ -37,8 +38,9 @@ export default function App() {
       {/* Main Content */}
       <main className="max-w-7xl mx-auto px-4 sm:px-6 py-8">
         <Routes>
-          <Route path="/" element={<TaskSubmit />} />
+          <Route path="/" element={<ChatFirst />} />
           <Route path="/task/:sessionId" element={<TaskProgress />} />
+          <Route path="/submit" element={<TaskSubmit />} />
         </Routes>
       </main>
     </div>

@@ -36,6 +36,8 @@ interface PipelineStore {
   messages: ChatMessage[];
   isStreaming: boolean;
   streamingContent: string;
+  isChatPhase: boolean;
+  workspaceDir: string | null;
 
   applySSEEvent: (event: SSEEvent) => void;
   hydrateFromSession: (session: SessionState) => void;
@@ -196,6 +198,8 @@ export const usePipelineStore = create<PipelineStore>((set, get) => ({
   messages: [],
   isStreaming: false,
   streamingContent: '',
+  isChatPhase: false,
+  workspaceDir: null,
 
   initStages: () => set({
     stages: createDefaultStages(),
@@ -211,6 +215,8 @@ export const usePipelineStore = create<PipelineStore>((set, get) => ({
     messages: [],
     isStreaming: false,
     streamingContent: '',
+    isChatPhase: false,
+    workspaceDir: null,
   }),
 
   hydrateFromSession: (session) => {
@@ -236,6 +242,8 @@ export const usePipelineStore = create<PipelineStore>((set, get) => ({
       messages: session.messages ?? [],
       isStreaming: false,
       streamingContent: '',
+      isChatPhase: session.status === 'chatting',
+      workspaceDir: (session as any).workspaceDir ?? null,
     });
   },
 
@@ -503,6 +511,8 @@ export const usePipelineStore = create<PipelineStore>((set, get) => ({
     messages: [],
     isStreaming: false,
     streamingContent: '',
+    isChatPhase: false,
+    workspaceDir: null,
   }),
 
   // Chat actions

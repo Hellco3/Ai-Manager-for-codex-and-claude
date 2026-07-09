@@ -21,12 +21,13 @@ async function parseError(res: Response): Promise<Error> {
 
 export async function postTask(
   task: string,
-  mode: 'auto' | 'semi-auto',
-): Promise<{ sessionId: string; status: SessionState['status'] }> {
+  mode: 'auto' | 'semi-auto' | 'chat-first',
+  workspaceDir?: string,
+): Promise<{ sessionId: string; status: string; workspaceDir?: string | null }> {
   const res = await fetch(`${BASE_URL}/tasks`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ task, mode }),
+    body: JSON.stringify({ task, mode, workspaceDir }),
   });
   if (!res.ok) {
     throw await parseError(res);
@@ -99,6 +100,31 @@ export async function sendMessage(
 export async function reconstructSession(sessionId: string): Promise<void> {
   const res = await fetch(`${BASE_URL}/sessions/${sessionId}/reconstruct`, {
     method: 'POST',
+  });
+  if (!res.ok) throw await parseError(res);
+}
+
+export async function confirmTask(
+  sessionId: string,
+  task?: string,
+  workspaceDir?: string,
+): Promise<void> {
+  const res = await fetch(`${BASE_URL}/sessions/${sessionId}/confirm`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ task, workspaceDir }),
+  });
+  if (!res.ok) throw await parseError(res);
+}
+
+export async function updateWorkspace(
+  sessionId: string,
+  workspaceDir: string,
+): Promise<void> {
+  const res = await fetch(`${BASE_URL}/sessions/${sessionId}/workspace`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ workspaceDir }),
   });
   if (!res.ok) throw await parseError(res);
 }

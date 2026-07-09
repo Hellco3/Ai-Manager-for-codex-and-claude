@@ -212,6 +212,7 @@ class Orchestrator {
 
               if (actualExecutor === 'codex') {
                 try {
+                  const wsDir = (session as any).workspaceDir as string | undefined;
                   const codexResult = await executeCodexSubtask(st, signal, (chunk: string) => {
                     sessionStore.appendSubtaskProgress(sessionId, st.id, chunk);
                     sseManager.broadcast(sessionId, {
@@ -219,7 +220,7 @@ class Orchestrator {
                       subtaskId: st.id,
                       chunk,
                     });
-                  });
+                  }, wsDir);
                   result = codexResult.text;
                   inputTokens = codexResult.inputTokens;
                   outputTokens = codexResult.outputTokens;
@@ -632,6 +633,118 @@ class Orchestrator {
 
   private broadcastStage(sessionId: string, type: 'stage:started' | 'stage:completed', stage: string): void {
     sseManager.broadcast(sessionId, { type, stage, timestamp: Date.now() });
+  }
+
+  /**
+   * Chat-first phase: generate a streaming conversational AI response without decomposition.
+   * Used when the user sends a message in 'chatting' mode — just talk, don't execute.
+   */
+  async chatFirstPhase(sessionId: string, userMessage: string): Promise<void> {
+    const session = sessionStore.get(sessionId);
+    if (!session) return;
+
+    const abortController = this.activeRuns.get(sessionId) ?? new AbortController();
+    if (!this.activeRuns.has(sessionId)) {
+      this.activeRuns.set(sessionId, abortController);
+    }
+
+    try {
+      await this.streamChatResponse(sessionId, userMessage, abortController.signal);
+    } catch (error: any) {
+      if (error.name === 'AbortError') return;
+      logger.error({ sessionId, error }, 'Chat-first phase failed');
+    }
+  }
+
+  /**
+   * Confirm and decompose: trigger task decomposition + execution from chat-first mode.
+   * Uses full conversation context to understand what the user wants.
+   */
+  async confirmAndDecompose(sessionId: string, refinedTask?: string): Promise<void> {
+    const session = sessionStore.get(sessionId);
+    if (!session) return;
+
+    const abortController = new AbortController();
+    this.activeRuns.set(sessionId, abortController);
+    const costTracker = this.costTrackers.get(sessionId) ?? new CostTracker();
+    this.costTrackers.set(sessionId, costTracker);
+
+    try {
+      // Build context from conversation history for decomposition
+      const taskDescription = refinedTask ?? session.task;
+      let contextTask = taskDescription;
+      if (session.messages && session.messages.length > 0) {
+        const history = session.messages.map(m => `${m.role}: ${m.content}`).join('\n');
+        contextTask = `原始任务描述：${taskDescription}\n\n对话历史（用户与 AI 的讨论）：\n${history}\n\n请基于对话历史中达成的共识，重新理解和拆解任务。尽量使用简体中文输出。`;
+      }
+
+      // Phase 1: Decompose
+      this.broadcastStage(sessionId, 'stage:started', 'decompose');
+      const { decomposeTask } = await import('./decomposer.js');
+      const { decomposition, inputTokens, outputTokens } = await decomposeTask(contextTask);
+      sessionStore.setDecomposition(sessionId, decomposition);
+      this.broadcastStage(sessionId, 'stage:completed', 'decompose');
+
+      const stats = costTracker.addEntry(config.DECOMPOSER_MODEL, inputTokens, outputTokens, 0);
+      sseManager.broadcast(sessionId, { type: 'cost:update', stats });
+
+      // Notify chat about the plan
+      const planSummary = decomposition.overview +
+        `\n\n我已将任务拆解为 ${decomposition.subtasks.length} 个子任务，预计耗时 ${decomposition.estimatedTimeMinutes ?? '未知'} 分钟。现在开始执行...`;
+      sseManager.broadcast(sessionId, {
+        type: 'message:complete',
+        content: planSummary,
+        role: 'assistant',
+        timestamp: Date.now(),
+      });
+      sessionStore.addMessage(sessionId, 'assistant', planSummary);
+
+      // Phase 2: Execute
+      await this.runExecuteStage(sessionId, costTracker, abortController.signal);
+
+      // Phase 3: Aggregate
+      await this.runAggregateStage(sessionId, costTracker);
+
+      // Phase 4: Generate completion report in chat
+      const session2 = sessionStore.get(sessionId)!;
+      const completedCount = Object.values(session2.subtaskStates!).filter(s => s.status === 'completed').length;
+      const failedCount = Object.values(session2.subtaskStates!).filter(s => s.status === 'failed' || s.status === 'timed_out').length;
+      const totalCost = costTracker.getTotalCost();
+      const totalDuration = costTracker.getTotalDuration();
+      const durationSec = Math.floor(totalDuration / 1000);
+      const durationStr = durationSec < 60 ? `${durationSec}s` : `${Math.floor(durationSec / 60)}m ${durationSec % 60}s`;
+
+      const reportSummary = `✅ 任务执行完成！\
+\n\n📊 **执行汇总**：\
+\n- 成功：${completedCount} 个子任务\
+\n- 失败：${failedCount} 个子任务\
+\n- 总耗时：${durationStr}\
+\n- 预估费用：$${totalCost.toFixed(4)}\
+\n\n有什么需要调整的吗？告诉我你的想法，我会重新规划并执行。`;
+
+      sessionStore.addMessage(sessionId, 'assistant', reportSummary);
+      // Stream it as a message for the chat UI
+      for (let i = 0; i < reportSummary.length; i += 5) {
+        const chunk = reportSummary.slice(i, i + 5);
+        sseManager.broadcast(sessionId, { type: 'message:chunk', chunk });
+        await new Promise(r => setTimeout(r, 10)); // simulate streaming
+      }
+      sseManager.broadcast(sessionId, {
+        type: 'message:complete',
+        content: reportSummary,
+        role: 'assistant',
+        timestamp: Date.now(),
+      });
+
+      this.completeSession(sessionId, costTracker);
+    } catch (error: any) {
+      if (error.name === 'AbortError') return;
+      logger.error({ sessionId, error }, 'Confirm and decompose failed');
+      sessionStore.updateStatus(sessionId, 'failed');
+      this.resetRunningSubtasks(sessionId);
+      sseManager.broadcast(sessionId, { type: 'session:error', error: error.message || 'Unknown error' });
+      this.activeRuns.delete(sessionId);
+    }
   }
 }
 

@@ -3,11 +3,11 @@ import { create } from 'zustand';
 interface SessionState {
   sessionId: string | null;
   status: string;
-  mode: 'auto' | 'semi-auto';
+  mode: 'auto' | 'semi-auto' | 'chat-first';
   task: string;
   error: string | null;
 
-  setSession: (sessionId: string, task: string, mode: 'auto' | 'semi-auto') => void;
+  setSession: (sessionId: string, task: string, mode: 'auto' | 'semi-auto' | 'chat-first') => void;
   setStatus: (status: string) => void;
   setError: (error: string) => void;
   reset: () => void;

@@ -97,12 +97,13 @@ export class SessionStore {
     }
   }
 
-  create(task: string, mode: 'auto' | 'semi-auto'): SessionState {
+  create(task: string, mode: 'auto' | 'semi-auto' | 'chat-first', workspaceDir?: string): SessionState {
     const sessionId = uuid();
     const now = Date.now();
+    const initialStatus = mode === 'chat-first' ? 'chatting' as const : 'decomposing' as const;
     const session: SessionState = {
       sessionId,
-      status: 'decomposing',
+      status: initialStatus,
       task,
       mode,
       subtaskStates: {},
@@ -110,9 +111,12 @@ export class SessionStore {
       createdAt: now,
       updatedAt: now,
     };
+    if (workspaceDir) {
+      (session as any).workspaceDir = workspaceDir;
+    }
     this.sessions.set(sessionId, session);
     this.markDirty();
-    logger.info({ sessionId, mode }, 'Session created');
+    logger.info({ sessionId, mode, workspaceDir }, 'Session created');
     return session;
   }
 
@@ -244,6 +248,15 @@ export class SessionStore {
     if (!session) return undefined;
     if (!session.messages) session.messages = [];
     session.messages.push({ role, content, timestamp: Date.now() });
+    session.updatedAt = Date.now();
+    this.markDirty();
+    return session;
+  }
+
+  setWorkspaceDir(sessionId: string, workspaceDir: string): SessionState | undefined {
+    const session = this.sessions.get(sessionId);
+    if (!session) return undefined;
+    (session as any).workspaceDir = workspaceDir;
     session.updatedAt = Date.now();
     this.markDirty();
     return session;

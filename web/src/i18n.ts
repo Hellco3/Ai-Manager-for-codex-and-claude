@@ -106,6 +106,22 @@ const zh = {
     empty: '暂无消息，发送跟进问题继续对话。',
     error: '发送消息失败',
   },
+  chatFirst: {
+    greeting: '你好！我是 AI 任务编排助手。请告诉我你想做什么项目，我们可以先讨论清楚需求，然后我来拆解并执行。',
+    placeholder: '描述你的项目想法...',
+    startTask: '开始任务',
+    startTaskHint: '需求已明确，点击开始拆解执行',
+    taskLabel: '当前任务',
+  },
+  workspace: {
+    label: '项目目录',
+    placeholder: '输入项目文件夹路径...',
+    browse: '浏览',
+    edit: '编辑',
+    save: '保存',
+    default: '默认（当前目录）',
+    invalid: '路径无效',
+  },
 };
 
 const en: typeof zh = {
@@ -214,6 +230,22 @@ const en: typeof zh = {
     minutesAgo: 'm ago',
     empty: 'No messages yet. Ask a follow-up question to continue.',
     error: 'Failed to send message',
+  },
+  chatFirst: {
+    greeting: "Hi! I'm your AI task orchestration assistant. Tell me what project you'd like to work on — we can discuss the requirements first, then I'll decompose and execute.",
+    placeholder: 'Describe your project idea...',
+    startTask: 'Start Task',
+    startTaskHint: 'Requirements are clear — click to start decomposition',
+    taskLabel: 'Current Task',
+  },
+  workspace: {
+    label: 'Project Dir',
+    placeholder: 'Enter project folder path...',
+    browse: 'Browse',
+    edit: 'Edit',
+    save: 'Save',
+    default: 'Default (current dir)',
+    invalid: 'Invalid path',
   },
 };
 

@@ -23,22 +23,40 @@ router.post('/tasks', async (req: Request, res: Response) => {
       return;
     }
 
-    const { task, mode } = req.body;
+    const { task, mode, workspaceDir } = req.body;
     if (!task || typeof task !== 'string') {
       res.status(400).json({ error: 'Invalid task submission', details: 'task is required' });
       return;
     }
 
-    const safeMode = mode === 'semi-auto' ? 'semi-auto' : 'auto';
+    const safeMode = (
+      mode === 'semi-auto' ? 'semi-auto' :
+      mode === 'chat-first' ? 'chat-first' :
+      'auto'
+    );
 
     // Create session
-    const session = sessionStore.create(task, safeMode);
-    logger.info({ sessionId: session.sessionId, mode: safeMode }, 'Task session created');
+    const session = sessionStore.create(task, safeMode, workspaceDir);
+    logger.info({ sessionId: session.sessionId, mode: safeMode, workspaceDir }, 'Task session created');
 
-    // Return immediately, processing happens asynchronously
+    // chat-first mode: don't decompose immediately, go to chatting phase
+    if (safeMode === 'chat-first') {
+      res.json({ sessionId: session.sessionId, status: 'chatting', workspaceDir: workspaceDir ?? null });
+
+      // Store the first user message
+      sessionStore.addMessage(session.sessionId, 'user', task);
+
+      // Fire off the chat-first phase (stream AI reply, no decomposition)
+      const { orchestrator } = await import('../services/orchestrator.js');
+      orchestrator.chatFirstPhase(session.sessionId, task).catch(err => {
+        logger.error({ sessionId: session.sessionId, error: err }, 'Chat-first phase failed');
+      });
+      return;
+    }
+
+    // Traditional auto/semi-auto: fire decomposition immediately
     res.json({ sessionId: session.sessionId, status: session.status });
 
-    // Fire off decomposition asynchronously
     const { orchestrator } = await import('../services/orchestrator.js');
     orchestrator.startSession(session.sessionId).catch(err => {
       logger.error({ sessionId: session.sessionId, error: err }, 'Orchestrator failed');
@@ -66,6 +84,7 @@ router.get('/tasks/:id', (req: Request, res: Response) => {
     decomposition: session.decomposition,
     subtaskStates: session.subtaskStates,
     messages: session.messages ?? [],
+    workspaceDir: (session as any).workspaceDir ?? null,
     costStats: session.costStats,
     createdAt: session.createdAt,
     updatedAt: session.updatedAt,
@@ -122,7 +141,6 @@ router.post('/tasks/:id/cancel', async (req: Request, res: Response) => {
   res.json({ cancelled: true });
 });
 
-// GET /api/sessions/:id/stream
 // POST /api/sessions/:id/message — send follow-up message within a session
 router.post('/sessions/:id/message', async (req: Request, res: Response) => {
   const id = param(req, 'id');
@@ -138,12 +156,31 @@ router.post('/sessions/:id/message', async (req: Request, res: Response) => {
     return;
   }
 
-  // Atomically claim the session — only allow transition from terminal/idle states
-  const claimed = sessionStore.tryTransitionStatus(
-    id,
-    ['completed', 'failed', 'cancelled', 'awaiting_review', 'timed_out'],
-    'decomposing',
-  );
+  // In chat-first (chatting) mode: just have a conversation, no decomposition
+  if (session.status === 'chatting') {
+    sessionStore.addMessage(id, 'user', message.trim());
+
+    // Broadcast user message
+    sseManager.broadcast(id, {
+      type: 'message:complete',
+      content: message.trim(),
+      role: 'user',
+      timestamp: Date.now(),
+    });
+
+    // Generate streaming AI reply (no decomposition)
+    const { orchestrator } = await import('../services/orchestrator.js');
+    orchestrator.chatFirstPhase(id, message.trim()).catch(err => {
+      logger.error({ sessionId: id, error: err }, 'Chat reply failed');
+    });
+
+    res.json({ accepted: true });
+    return;
+  }
+
+  // For terminal/idle states: trigger full continueSession (re-decompose + execute)
+  const terminalStates: Array<'completed' | 'failed' | 'cancelled' | 'awaiting_review' | 'timed_out'> = ['completed', 'failed', 'cancelled', 'awaiting_review', 'timed_out'];
+  const claimed = sessionStore.tryTransitionStatus(id, terminalStates as any, 'decomposing');
   if (!claimed) {
     res.status(409).json({ error: 'Session is currently processing. Please wait for it to complete before sending a message.' });
     return;
@@ -185,6 +222,83 @@ router.post('/sessions/:id/reconstruct', async (req: Request, res: Response) => 
   res.json({ accepted: true });
 });
 
+// POST /api/sessions/:id/confirm — confirm task and trigger decomposition (chat-first mode)
+router.post('/sessions/:id/confirm', async (req: Request, res: Response) => {
+  const id = param(req, 'id');
+  const session = sessionStore.get(id);
+  if (!session) {
+    res.status(404).json({ error: 'Session not found' });
+    return;
+  }
+
+  // Allow confirm from chatting or terminal states
+  if (session.status !== 'chatting' &&
+      session.status !== 'completed' &&
+      session.status !== 'failed' &&
+      session.status !== 'cancelled') {
+    res.status(409).json({ error: 'Session is currently processing. Please wait.' });
+    return;
+  }
+
+  const { task: refinedTask, workspaceDir } = req.body;
+
+  // Atomically claim
+  const claimed = sessionStore.tryTransitionStatus(id, [session.status], 'decomposing');
+  if (!claimed) {
+    res.status(409).json({ error: 'Session state changed. Please try again.' });
+    return;
+  }
+
+  // Update workspaceDir if provided
+  if (workspaceDir) {
+    sessionStore.setWorkspaceDir(id, workspaceDir);
+  }
+
+  // Trigger decomposition + execution
+  const { orchestrator } = await import('../services/orchestrator.js');
+  orchestrator.confirmAndDecompose(id, refinedTask).catch(err => {
+    logger.error({ sessionId: id, error: err }, 'Confirm and decompose failed');
+  });
+
+  res.json({ accepted: true });
+});
+
+// POST /api/sessions/:id/workspace — update project workspace directory
+router.post('/sessions/:id/workspace', async (req: Request, res: Response) => {
+  const id = param(req, 'id');
+  const session = sessionStore.get(id);
+  if (!session) {
+    res.status(404).json({ error: 'Session not found' });
+    return;
+  }
+
+  const { workspaceDir } = req.body;
+  if (!workspaceDir || typeof workspaceDir !== 'string') {
+    res.status(400).json({ error: 'workspaceDir is required' });
+    return;
+  }
+
+  // Validate path exists
+  const fs = await import('fs/promises');
+  try {
+    await fs.access(workspaceDir);
+  } catch {
+    res.status(400).json({ error: `Directory not found: ${workspaceDir}` });
+    return;
+  }
+
+  sessionStore.setWorkspaceDir(id, workspaceDir);
+  sseManager.broadcast(id, {
+    type: 'message:complete',
+    content: `Workspace changed to: ${workspaceDir}`,
+    role: 'system',
+    timestamp: Date.now(),
+  });
+
+  res.json({ workspaceDir });
+});
+
+// GET /api/sessions/:id/stream
 router.get('/sessions/:id/stream', (req: Request, res: Response) => {
   const sessionId = param(req, 'id');
   const session = sessionStore.get(sessionId);

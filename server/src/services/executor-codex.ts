@@ -59,24 +59,29 @@ export async function executeCodexSubtask(
   subtask: Subtask,
   signal: AbortSignal,
   onProgress: (chunk: string) => void,
+  workspaceDir?: string,
 ): Promise<CodexExecutionResult> {
   const codexPath = config.CODEX_CLI_PATH;
+  const cwd = workspaceDir ?? process.cwd();
 
-  logger.info({ subtaskId: subtask.id, codexPath, model: config.CODEX_MODEL }, 'Executing Codex subtask');
+  logger.info({ subtaskId: subtask.id, codexPath, model: config.CODEX_MODEL, cwd }, 'Executing Codex subtask');
 
   return new Promise<CodexExecutionResult>((resolve, reject) => {
-    const proc = spawn(codexPath, [
+    const args = [
       'exec',
       '--skip-git-repo-check',
       '--json',
       '--dangerously-bypass-approvals-and-sandbox',
       '--model', config.CODEX_MODEL,
+      '-C', cwd,
       '--',
       `[CODING TASK] ${subtask.description}
 
 尽量使用简体中文输出解释、总结、注释和类似提交说明的文字；如果任务明确要求其他语言，再按任务要求处理。
 Provide your complete implementation with code. No explanations unless strictly necessary.`,
-    ], {
+    ];
+
+    const proc = spawn(codexPath, args, {
       stdio: ['pipe', 'pipe', 'pipe'],
       shell: process.platform === 'win32',
       env: {

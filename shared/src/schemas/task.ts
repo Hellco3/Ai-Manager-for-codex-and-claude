@@ -30,6 +30,7 @@ export type TaskDecomposition = z.infer<typeof TaskDecomposition>;
 
 // --- Session Status ---
 export const SessionStatus = z.enum([
+  'chatting',
   'decomposing',
   'awaiting_review',
   'executing',
