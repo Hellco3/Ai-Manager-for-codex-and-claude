@@ -124,7 +124,7 @@ export default function ChatFirst() {
     scrollToBottom(true);
 
     // Detect confirmation keywords in user message
-    const confirmPattern = /开始执行|开始拆解|开始吧|执行任务|拆解并执行|开始任务|确认执行|run it|start it|execute/;
+    const confirmPattern = /开始执行|开始拆解|开始吧|执行任务|拆解并执行|开始任务|确认执行|run it|start it|execute/i;
     if (sessionId && confirmPattern.test(message.trim()) && !hasPipelineStarted) {
       addUserMessage(message, attachmentIds.length > 0 ? attachmentIds : undefined);
       try {
@@ -280,7 +280,7 @@ export default function ChatFirst() {
               <p className="text-xs font-medium uppercase tracking-wider text-purple-300/80 mb-2">{t.stages.decompose}</p>
               <p className="text-sm leading-6 text-slate-300">{decomposition.overview}</p>
               <p className="mt-2 text-[11px] text-slate-500">
-                {decomposition.executionOrder.join(' → ')}
+                {decomposition.executionOrder.join(' -> ')}
                 {decomposition.estimatedTimeMinutes && (
                   <span className="ml-2">· est. {decomposition.estimatedTimeMinutes}min</span>
                 )}
@@ -327,7 +327,7 @@ export default function ChatFirst() {
                           <span className="text-[10px] font-mono text-slate-500">{idx + 1}.</span>
                           <span className="text-[10px] uppercase font-semibold tracking-wider">{st.kind}</span>
                           {st.dependencies.length > 0 && (
-                            <span className="text-[10px] text-slate-500">→ {st.dependencies.join(', ')}</span>
+                            <span className="text-[10px] text-slate-500">deps: {st.dependencies.join(', ')}</span>
                           )}
                         </div>
                         <p className="text-xs leading-5">{st.description}</p>
