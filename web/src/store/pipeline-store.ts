@@ -43,6 +43,7 @@ interface PipelineStore {
   statusMessage: string | null;
   statusStep: string | null;
   statusProgress: number;
+  statusStartedAt: number | null;
 
   applySSEEvent: (event: SSEEvent) => void;
   hydrateFromSession: (session: SessionState) => void;
@@ -220,6 +221,7 @@ export const usePipelineStore = create<PipelineStore>((set, get) => ({
   statusMessage: null,
   statusStep: null,
   statusProgress: 0,
+  statusStartedAt: null,
 
   initStages: () => set({
     stages: createDefaultStages(),
@@ -525,11 +527,12 @@ export const usePipelineStore = create<PipelineStore>((set, get) => ({
         break;
 
       case 'status:progress':
-        set({
+        set((s) => ({
           statusMessage: (event as any).message ?? null,
           statusStep: (event as any).step ?? null,
           statusProgress: (event as any).progress ?? 0,
-        });
+          statusStartedAt: s.statusStartedAt ?? Date.now(),
+        }));
         break;
 
       case 'heartbeat':

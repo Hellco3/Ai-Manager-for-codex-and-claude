@@ -32,6 +32,7 @@ export default function ChatFirst() {
   const statusMessage = usePipelineStore((s) => s.statusMessage);
   const statusStep = usePipelineStore((s) => s.statusStep);
   const statusProgress = usePipelineStore((s) => s.statusProgress);
+  const statusStartedAt = usePipelineStore((s) => s.statusStartedAt);
   const costStats = usePipelineStore((s) => s.costStats);
   const totalCost = usePipelineStore((s) => s.totalCost);
   const totalDurationMs = usePipelineStore((s) => s.totalDurationMs);
