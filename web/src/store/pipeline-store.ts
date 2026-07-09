@@ -40,6 +40,9 @@ interface PipelineStore {
   isChatPhase: boolean;
   workspaceDir: string | null;
   attachmentsById: Record<string, any>;
+  statusMessage: string | null;
+  statusStep: string | null;
+  statusProgress: number;
 
   applySSEEvent: (event: SSEEvent) => void;
   hydrateFromSession: (session: SessionState) => void;
@@ -214,6 +217,9 @@ export const usePipelineStore = create<PipelineStore>((set, get) => ({
   isChatPhase: false,
   workspaceDir: null,
   attachmentsById: {},
+  statusMessage: null,
+  statusStep: null,
+  statusProgress: 0,
 
   initStages: () => set({
     stages: createDefaultStages(),
@@ -516,6 +522,14 @@ export const usePipelineStore = create<PipelineStore>((set, get) => ({
             [(event as any).attachment.id]: (event as any).attachment,
           },
         }));
+        break;
+
+      case 'status:progress':
+        set({
+          statusMessage: (event as any).message ?? null,
+          statusStep: (event as any).step ?? null,
+          statusProgress: (event as any).progress ?? 0,
+        });
         break;
 
       case 'heartbeat':

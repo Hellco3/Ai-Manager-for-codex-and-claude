@@ -19,6 +19,7 @@ export const SSEEventType = z.enum([
   'message:chunk',
   'message:complete',
   'attachment:updated',
+  'status:progress',
   'heartbeat',
 ]);
 export type SSEEventType = z.infer<typeof SSEEventType>;
@@ -41,6 +42,7 @@ export const SSEEvent = z.discriminatedUnion('type', [
   z.object({ id: z.string().optional(), type: z.literal('message:chunk'), chunk: z.string() }),
   z.object({ id: z.string().optional(), type: z.literal('message:complete'), content: z.string(), role: z.string(), timestamp: z.number(), attachmentIds: z.array(z.string()).optional() }),
   z.object({ id: z.string().optional(), type: z.literal('attachment:updated'), attachment: FileAttachment }),
+  z.object({ id: z.string().optional(), type: z.literal('status:progress'), message: z.string(), step: z.string(), progress: z.number().optional() }),
   z.object({ id: z.string().optional(), type: z.literal('heartbeat'), timestamp: z.number() }),
 ]);
 export type SSEEvent = z.infer<typeof SSEEvent>;

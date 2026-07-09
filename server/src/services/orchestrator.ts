@@ -778,6 +778,13 @@ class Orchestrator {
 
       // Phase 1: Decompose
       this.broadcastStage(sessionId, 'stage:started', 'decompose');
+      sseManager.broadcast(sessionId, {
+        type: 'status:progress',
+        message: '正在分析任务需求...',
+        step: 'decompose',
+        progress: 0,
+      });
+
       const { decomposeTask } = await import('./decomposer.js');
 
       let decompositionResult: { decomposition: any; inputTokens: number; outputTokens: number };
@@ -790,6 +797,12 @@ class Orchestrator {
         ]);
       } catch (err: any) {
         logger.error({ sessionId, error: err }, 'Decomposition failed');
+        sseManager.broadcast(sessionId, {
+          type: 'status:progress',
+          message: '拆解失败，请稍后重试',
+          step: 'error',
+          progress: 0,
+        });
         sseManager.broadcast(sessionId, {
           type: 'message:complete',
           content: `任务拆解失败：${err.message || '超时'}。请稍后重试或简化任务描述。`,
@@ -806,6 +819,13 @@ class Orchestrator {
       sessionStore.setDecomposition(sessionId, decomposition);
       this.broadcastStage(sessionId, 'stage:completed', 'decompose');
 
+      sseManager.broadcast(sessionId, {
+        type: 'status:progress',
+        message: `已拆解为 ${decomposition.subtasks.length} 个子任务`,
+        step: 'decompose',
+        progress: 100,
+      });
+
       const stats = costTracker.addEntry(config.DECOMPOSER_MODEL, inputTokens, outputTokens, 0);
       sseManager.broadcast(sessionId, { type: 'cost:update', stats });
 
@@ -821,9 +841,21 @@ class Orchestrator {
       sessionStore.addMessage(sessionId, 'assistant', planSummary);
 
       // Phase 2: Execute
+      sseManager.broadcast(sessionId, {
+        type: 'status:progress',
+        message: '正在执行子任务...',
+        step: 'execute',
+        progress: 30,
+      });
       await this.runExecuteStage(sessionId, costTracker, abortController.signal);
 
       // Phase 3: Aggregate
+      sseManager.broadcast(sessionId, {
+        type: 'status:progress',
+        message: '正在汇总结果...',
+        step: 'aggregate',
+        progress: 80,
+      });
       await this.runAggregateStage(sessionId, costTracker);
 
       // Phase 4: Generate completion report in chat

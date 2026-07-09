@@ -29,6 +29,9 @@ export default function ChatFirst() {
   const isComplete = usePipelineStore((s) => s.isComplete);
   const isError = usePipelineStore((s) => s.isError);
   const errorMessage = usePipelineStore((s) => s.errorMessage);
+  const statusMessage = usePipelineStore((s) => s.statusMessage);
+  const statusStep = usePipelineStore((s) => s.statusStep);
+  const statusProgress = usePipelineStore((s) => s.statusProgress);
   const costStats = usePipelineStore((s) => s.costStats);
   const totalCost = usePipelineStore((s) => s.totalCost);
   const totalDurationMs = usePipelineStore((s) => s.totalDurationMs);
@@ -245,6 +248,28 @@ export default function ChatFirst() {
 
   return (
     <div className="mx-auto max-w-5xl px-3 pb-4 pt-4 md:px-5 md:pb-6">
+      {/* Status progress bar */}
+      {statusMessage && (
+        <div className="mb-3 rounded-2xl border border-purple-500/20 bg-purple-500/8 px-4 py-3">
+          <div className="flex items-center gap-3">
+            <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-purple-500/15">
+              <svg className="h-4 w-4 animate-spin text-purple-300" fill="none" viewBox="0 0 24 24">
+                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+              </svg>
+            </div>
+            <div className="flex-1 min-w-0">
+              <p className="text-sm font-medium text-purple-200">{statusMessage}</p>
+              <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-slate-800/95">
+                <div
+                  className="h-full rounded-full bg-purple-500 transition-[width] duration-700 ease-out"
+                  style={{ width: `${Math.min(Math.max(statusProgress, 2), 100)}%` }}
+                />
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
       <div className="mb-4 flex items-center justify-between gap-3">
         <div>
           <div className="text-[11px] uppercase tracking-[0.18em] text-slate-500">{t.chatFirst.taskLabel}</div>
