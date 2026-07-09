@@ -1,6 +1,7 @@
 import React from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
 import type { SubtaskState } from '@ai_manager/shared';
+import { langName } from '../../i18n.js';
 
 type LaneId = 'claude' | 'codex';
 type LaneStatus = 'pending' | 'running' | 'completed' | 'failed';
@@ -243,18 +244,20 @@ function LaneCard({ state, index }: LaneCardProps) {
 }
 
 function EmptyLane({ label }: { label: string }) {
+  const isZh = langName === 'zh';
   return (
     <motion.div
       initial={{ opacity: 0 }}
       animate={{ opacity: 1 }}
       className="rounded-2xl border border-dashed border-slate-800 bg-slate-950/60 p-6 text-sm text-slate-500"
     >
-      {label} awaiting orchestration...
+      {isZh ? `${label} 等待编排中...` : `${label} awaiting orchestration...`}
     </motion.div>
   );
 }
 
 export default function SwimLaneView({ subtasks, currentStage }: SwimLaneViewProps) {
+  const isZh = langName === 'zh';
   const entries = Object.values(subtasks);
   const claude = entries.filter((item, index) => getLane(item.subtask.kind, index) === 'claude');
   const codex = entries.filter((item, index) => getLane(item.subtask.kind, index) === 'codex');
@@ -268,12 +271,16 @@ export default function SwimLaneView({ subtasks, currentStage }: SwimLaneViewPro
       <div className="relative border-b border-slate-800/80 px-5 py-4 sm:px-6">
         <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
           <div>
-            <div className="text-[11px] uppercase tracking-[0.34em] text-cyan-300/80">Parallel Orchestration</div>
-            <h3 className="mt-1 text-lg font-semibold text-white">Claude and Codex swimlanes</h3>
+            <div className="text-[11px] uppercase tracking-[0.34em] text-cyan-300/80">{isZh ? '并行编排' : 'Parallel Orchestration'}</div>
+            <h3 className="mt-1 text-lg font-semibold text-white">{isZh ? 'Claude 与 Codex 泳道' : 'Claude and Codex swimlanes'}</h3>
           </div>
           <div className="inline-flex items-center gap-2 rounded-full border border-slate-800 bg-slate-900/90 px-3 py-1.5 text-[11px] uppercase tracking-[0.28em] text-slate-300">
             <span className="h-2 w-2 rounded-full bg-cyan-300 shadow-[0_0_12px_rgba(103,232,249,0.8)]" />
-            {currentStage === 'execute' ? 'Execution Live' : currentStage ? `${currentStage} stage` : 'Idle'}
+            {currentStage === 'execute'
+              ? (isZh ? '执行中' : 'Execution Live')
+              : currentStage
+                ? (isZh ? `${currentStage} 阶段` : `${currentStage} stage`)
+                : (isZh ? '空闲' : 'Idle')}
           </div>
         </div>
       </div>
@@ -300,28 +307,30 @@ export default function SwimLaneView({ subtasks, currentStage }: SwimLaneViewPro
                     <div>
                       <div className={`text-sm font-semibold ${laneMeta.accent}`}>{laneMeta.label}</div>
                       <div className="mt-1 text-[11px] uppercase tracking-[0.22em] text-slate-500">
-                        {laneId === 'claude' ? 'reasoning / research' : 'build / integration'}
+                        {laneId === 'claude'
+                          ? (isZh ? '推理 / 研究' : 'reasoning / research')
+                          : (isZh ? '构建 / 集成' : 'build / integration')}
                       </div>
                     </div>
                   </div>
 
                   <div className="mt-4 flex flex-wrap gap-2">
                     <span className={`rounded-full border px-2.5 py-1 text-[10px] uppercase tracking-[0.22em] ${laneMeta.chip}`}>
-                      {summary.total} tasks
+                      {summary.total} {isZh ? '任务' : 'tasks'}
                     </span>
                     {summary.running > 0 && (
                       <span className="rounded-full border border-blue-400/25 bg-blue-500/10 px-2.5 py-1 text-[10px] uppercase tracking-[0.22em] text-blue-200">
-                        {summary.running} running
+                        {summary.running} {isZh ? '执行中' : 'running'}
                       </span>
                     )}
                     {summary.completed > 0 && (
                       <span className="rounded-full border border-emerald-400/25 bg-emerald-500/10 px-2.5 py-1 text-[10px] uppercase tracking-[0.22em] text-emerald-200">
-                        {summary.completed} done
+                        {summary.completed} {isZh ? '完成' : 'done'}
                       </span>
                     )}
                     {summary.failed > 0 && (
                       <span className="rounded-full border border-rose-400/25 bg-rose-500/10 px-2.5 py-1 text-[10px] uppercase tracking-[0.22em] text-rose-200">
-                        {summary.failed} failed
+                        {summary.failed} {isZh ? '失败' : 'failed'}
                       </span>
                     )}
                   </div>
