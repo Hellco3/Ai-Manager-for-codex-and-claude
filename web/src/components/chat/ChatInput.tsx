@@ -1,5 +1,5 @@
 import React, { useState, useRef, useCallback, useEffect } from 'react';
-import { t } from '../../i18n.js';
+import { langName, t } from '../../i18n.js';
 import { useUploadStore } from '../../store/upload-store.js';
 import FilePreview from './FilePreview.jsx';
 
@@ -10,6 +10,7 @@ interface ChatInputProps {
 }
 
 export default function ChatInput({ onSend, isDisabled, sessionId }: ChatInputProps) {
+  const isZh = langName === 'zh';
   const [text, setText] = useState('');
   const [isDragOver, setIsDragOver] = useState(false);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
@@ -243,8 +244,8 @@ export default function ChatInput({ onSend, isDisabled, sessionId }: ChatInputPr
             onClick={handleCameraButtonClick}
             disabled={isDisabled || !isOnline}
             className="icon-button h-10 w-10 md:hidden"
-            title="Camera"
-            aria-label="Camera"
+            title={isZh ? '拍照上传' : 'Camera'}
+            aria-label={isZh ? '拍照上传' : 'Camera'}
           >
             <svg className="h-[18px] w-[18px]" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M3 9a2 2 0 012-2h2l1.2-2h7.6L17 7h2a2 2 0 012 2v8a2 2 0 01-2 2H5a2 2 0 01-2-2V9zm9 8a4 4 0 100-8 4 4 0 000 8z" />
@@ -308,7 +309,7 @@ export default function ChatInput({ onSend, isDisabled, sessionId }: ChatInputPr
       </div>
 
       <p id="upload-hint" className="mt-2 px-1 text-[11px] text-slate-500">
-        {t.upload?.pasteHint ?? 'Paste images/files supported'} | Shift+Enter for new line
+        {t.upload?.pasteHint ?? 'Paste images/files supported'} | {isZh ? 'Shift+Enter 换行' : 'Shift+Enter for new line'}
       </p>
     </div>
   );
