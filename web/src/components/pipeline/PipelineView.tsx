@@ -2,6 +2,7 @@ import React from 'react';
 import { motion } from 'framer-motion';
 import type { SubtaskState } from '@ai_manager/shared';
 import SwimLaneView from './SwimLaneView.js';
+import { langName } from '../../i18n.js';
 
 interface Stage {
   name: string;
@@ -25,6 +26,7 @@ export default function PipelineView({
   stageIcons,
   subtasks,
 }: PipelineViewProps) {
+  const isZh = langName === 'zh';
   const stageOrder = ['decompose', 'review', 'execute', 'aggregate'];
 
   return (
@@ -127,7 +129,7 @@ export default function PipelineView({
             <div className="flex items-center gap-2 text-sm">
               <div className="h-2 w-2 rounded-full bg-blue-400 animate-pulse" />
               <span className="text-slate-400">
-                Running: <span className="text-blue-400">{stageLabels[currentStage]}</span>
+                {isZh ? '执行中：' : 'Running: '}<span className="text-blue-400">{stageLabels[currentStage]}</span>
               </span>
               <span className="ml-auto text-xs text-slate-600">
                 {stages[currentStage]?.startedAt
