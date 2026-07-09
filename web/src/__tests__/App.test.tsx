@@ -12,7 +12,7 @@ describe('App', () => {
         <App />
       </BrowserRouter>,
     );
-    expect(screen.getByRole('heading', { level: 1 })).toBeInTheDocument();
+    expect(screen.getAllByRole('heading', { level: 1 })).toHaveLength(2);
   });
 
   it('renders the i18n header', () => {
