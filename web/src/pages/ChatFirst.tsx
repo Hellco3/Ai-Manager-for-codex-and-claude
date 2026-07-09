@@ -248,26 +248,21 @@ export default function ChatFirst() {
 
   return (
     <div className="mx-auto max-w-5xl px-3 pb-4 pt-4 md:px-5 md:pb-6">
-      {/* Status progress bar */}
+      {/* Processing indicator */}
       {statusMessage && (
-        <div className="mb-3 rounded-2xl border border-purple-500/20 bg-purple-500/8 px-4 py-3">
-          <div className="flex items-center gap-3">
-            <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-purple-500/15">
-              <svg className="h-4 w-4 animate-spin text-purple-300" fill="none" viewBox="0 0 24 24">
-                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
-              </svg>
-            </div>
-            <div className="flex-1 min-w-0">
-              <p className="text-sm font-medium text-purple-200">{statusMessage}</p>
-              <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-slate-800/95">
-                <div
-                  className="h-full rounded-full bg-purple-500 transition-[width] duration-700 ease-out"
-                  style={{ width: `${Math.min(Math.max(statusProgress, 2), 100)}%` }}
-                />
-              </div>
-            </div>
+        <div className="mb-3 flex items-center gap-2 px-1">
+          <div className="flex items-center gap-1.5 text-sm text-purple-300/80">
+            <svg className="h-3.5 w-3.5 animate-spin" fill="none" viewBox="0 0 24 24">
+              <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+              <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+            </svg>
+            <span>{statusMessage}</span>
           </div>
+          <span className="inline-flex gap-0.5">
+            <span className="w-1 h-1 rounded-full bg-purple-400/60 animate-bounce" style={{ animationDelay: '0ms' }} />
+            <span className="w-1 h-1 rounded-full bg-purple-400/60 animate-bounce" style={{ animationDelay: '200ms' }} />
+            <span className="w-1 h-1 rounded-full bg-purple-400/60 animate-bounce" style={{ animationDelay: '400ms' }} />
+          </span>
         </div>
       )}
       <div className="mb-4 flex items-center justify-between gap-3">
