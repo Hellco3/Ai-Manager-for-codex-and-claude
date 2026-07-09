@@ -1,4 +1,3 @@
-// 语言包
 const zh = {
   app: { title: 'AI 任务编排器', subtitle: '任务编排平台' },
   home: {
@@ -7,24 +6,24 @@ const zh = {
     desc: '描述你的任务，AI 编排器会将其拆解为子任务，分发给 Claude 和 Codex 并行执行，并实时展示进度。',
   },
   form: {
-    placeholder: '详细描述你的任务...\n\n示例：创建一个带用户认证的 React 管理面板，包含数据表格（排序/分页）和 WebSocket 实时图表更新。',
+    placeholder: '请详细描述你的任务...\n\n示例：创建一个带用户认证的 React 管理后台，包含可排序/分页的数据表格，以及通过 WebSocket 实时刷新的图表。',
     mode: '模式',
     auto: '自动',
     semiAuto: '半自动',
     autoDesc: '全自动拆解并执行',
     semiAutoDesc: '执行前先审核拆解方案',
     execute: '执行任务',
-    decomposing: '拆解中...',
+    decomposing: '正在拆解...',
     chars: '字符',
-    beSpecific: '描述越详细，效果越好',
+    beSpecific: '描述越具体，效果越好',
   },
   progress: {
     title: '任务进度',
-    newTask: '新建任务',
-    cost: '费用',
+    newTask: '新任务',
+    cost: '成本',
     cancel: '取消',
     startNew: '开始新任务',
-    running: '运行中',
+    running: '执行中',
   },
   stages: {
     decompose: '拆解',
@@ -39,7 +38,7 @@ const zh = {
     truncated: '...（已截断）',
     priority: '优先级',
     complexity: '复杂度',
-    retries: '重试',
+    retries: '重试次数',
     deps: '依赖',
   },
   review: {
@@ -48,18 +47,18 @@ const zh = {
     approve: '确认并执行',
     approving: '确认中...',
     executionOrder: '执行顺序',
-    est: '预估',
+    est: '预计',
     min: '分钟',
   },
   stats: {
-    costTitle: '费用 & 耗时',
+    costTitle: '成本与耗时',
     total: '总计',
     durationTitle: '总耗时',
   },
   status: {
     pending: '待执行',
     queued: '已排队',
-    running: '运行中',
+    running: '执行中',
     completed: '已完成',
     failed: '失败',
     timedOut: '超时',
@@ -69,7 +68,7 @@ const zh = {
     failed: '执行失败',
     cancelled: '任务已取消',
     timeout: '任务超时',
-    allDone: '所有子任务已执行完毕',
+    allDone: '所有子任务均已成功执行',
   },
   lane: {
     claude: 'Claude 通道',
@@ -77,24 +76,24 @@ const zh = {
     claudeDesc: '推理 / 研究',
     codexDesc: '构建 / 集成',
     tasks: '任务',
-    running: '运行中',
+    running: '执行中',
     done: '已完成',
     failed: '失败',
-    awaiting: '等待编排...',
+    awaiting: '等待编排中...',
     live: '实时执行中',
     stage: '阶段',
     idle: '空闲',
     orchestration: '并行编排',
-    lanes: 'Claude 和 Codex 泳道',
+    lanes: 'Claude 与 Codex 泳道',
   },
   features: [
-    { icon: '⚡', title: '智能拆解', desc: 'Claude 智能分析并拆解任务' },
-    { icon: '🔄', title: '并行执行', desc: '子任务在 Claude 和 Codex 上并行运行' },
-    { icon: '📊', title: '实时进度', desc: '每个子任务的输出实时流式展示' },
+    { icon: 'AI', title: '智能拆解', desc: 'Claude 智能分析并拆解任务' },
+    { icon: 'PX', title: '并行执行', desc: '子任务在 Claude 与 Codex 上并行执行' },
+    { icon: 'RT', title: '实时进度', desc: '每个子任务的输出都会流式更新' },
   ],
   chat: {
     title: '对话',
-    placeholder: '发送跟进消息...',
+    placeholder: '发送后续消息...',
     send: '发送',
     reconstruct: '重新规划',
     user: '你',
@@ -103,14 +102,14 @@ const zh = {
     streaming: '思考中...',
     justNow: '刚刚',
     minutesAgo: '分钟前',
-    empty: '暂无消息，发送跟进问题继续对话。',
+    empty: '暂时没有消息，发送后续问题继续对话。',
     error: '发送消息失败',
   },
   chatFirst: {
-    greeting: '你好！我是 AI 任务编排助手。请告诉我你想做什么项目，我们可以先讨论清楚需求，然后我来拆解并执行。',
+    greeting: '你好，我是 AI 任务编排助手。告诉我你想做什么项目，我们可以先把需求聊清楚，再开始拆解与执行。',
     placeholder: '描述你的项目想法...',
     startTask: '开始任务',
-    startTaskHint: '需求已明确，点击开始拆解执行',
+    startTaskHint: '需求已经明确，点击开始拆解执行',
     taskLabel: '当前任务',
   },
   workspace: {
@@ -128,7 +127,7 @@ const zh = {
     remove: '移除',
     fileTooLarge: '文件过大',
     unsupportedType: '不支持的文件类型',
-    pasteHint: '支持粘贴图片/文件',
+    pasteHint: '支持粘贴图片或文件',
     addFile: '添加文件',
     dropHere: '释放以上传文件',
     retry: '重试',
@@ -140,19 +139,19 @@ const en: typeof zh = {
   home: {
     hero: 'AI Task Orchestrator',
     powered: 'Powered by Claude + Codex',
-    desc: 'Describe your task, and our AI orchestrator will decompose it into subtasks, distribute them to Claude and Codex, and execute them in parallel with real-time progress tracking.',
+    desc: 'Describe your task, and the orchestrator will break it into subtasks, assign them to Claude and Codex, and execute them in parallel with live progress.',
   },
   form: {
-    placeholder: 'Describe your task in detail...\n\nExample: Create a React dashboard with user authentication, a data table with sorting/pagination, and real-time chart updates via WebSocket.',
+    placeholder: 'Describe your task in detail...\n\nExample: Create a React dashboard with authentication, a sortable paginated table, and real-time chart updates over WebSocket.',
     mode: 'Mode',
     auto: 'Auto',
     semiAuto: 'Semi-Auto',
     autoDesc: 'Fully automatic decomposition and execution',
-    semiAutoDesc: 'Review and approve decomposition before execution',
+    semiAutoDesc: 'Review decomposition before execution',
     execute: 'Execute Task',
     decomposing: 'Decomposing...',
     chars: 'characters',
-    beSpecific: 'Be specific for best results',
+    beSpecific: 'Be specific for better results',
   },
   progress: {
     title: 'Task Progress',
@@ -176,7 +175,7 @@ const en: typeof zh = {
     priority: 'Priority',
     complexity: 'Complexity',
     retries: 'Retries',
-    deps: 'Deps',
+    deps: 'Dependencies',
   },
   review: {
     title: 'Review Decomposition',
@@ -203,9 +202,9 @@ const en: typeof zh = {
   },
   error: {
     failed: 'Execution Failed',
-    cancelled: 'Task cancelled by user',
+    cancelled: 'Task cancelled',
     timeout: 'Task timed out',
-    allDone: 'All subtasks have been executed successfully',
+    allDone: 'All subtasks completed successfully',
   },
   lane: {
     claude: 'Claude Lane',
@@ -224,9 +223,9 @@ const en: typeof zh = {
     lanes: 'Claude and Codex swimlanes',
   },
   features: [
-    { icon: '⚡', title: 'Auto Decomposition', desc: 'Claude analyzes and breaks down tasks intelligently' },
-    { icon: '🔄', title: 'Parallel Execution', desc: 'Subtasks run concurrently on Claude & Codex' },
-    { icon: '📊', title: 'Real-time Progress', desc: 'Live streaming of every subtask\'s output' },
+    { icon: 'AI', title: 'Auto Decomposition', desc: 'Claude analyzes and decomposes tasks intelligently' },
+    { icon: 'PX', title: 'Parallel Execution', desc: 'Subtasks run concurrently on Claude and Codex' },
+    { icon: 'RT', title: 'Real-time Progress', desc: 'Live streaming updates for every subtask' },
   ],
   chat: {
     title: 'Conversation',
@@ -239,14 +238,14 @@ const en: typeof zh = {
     streaming: 'Thinking...',
     justNow: 'just now',
     minutesAgo: 'm ago',
-    empty: 'No messages yet. Ask a follow-up question to continue.',
+    empty: 'No messages yet. Send a follow-up to continue.',
     error: 'Failed to send message',
   },
   chatFirst: {
-    greeting: "Hi! I'm your AI task orchestration assistant. Tell me what project you'd like to work on — we can discuss the requirements first, then I'll decompose and execute.",
+    greeting: "Hi, I'm your AI task orchestration assistant. Tell me what you'd like to build, and we can clarify the requirements before decomposition and execution.",
     placeholder: 'Describe your project idea...',
     startTask: 'Start Task',
-    startTaskHint: 'Requirements are clear — click to start decomposition',
+    startTaskHint: 'Requirements are clear. Click to start decomposition.',
     taskLabel: 'Current Task',
   },
   workspace: {
@@ -255,7 +254,7 @@ const en: typeof zh = {
     browse: 'Browse',
     edit: 'Edit',
     save: 'Save',
-    default: 'Default (current dir)',
+    default: 'Default (current directory)',
     invalid: 'Invalid path',
   },
   upload: {
@@ -264,24 +263,20 @@ const en: typeof zh = {
     remove: 'Remove',
     fileTooLarge: 'File too large',
     unsupportedType: 'Unsupported file type',
-    pasteHint: 'Paste images/files supported',
+    pasteHint: 'Paste images or files',
     addFile: 'Add file',
     dropHere: 'Drop to upload',
     retry: 'Retry',
   },
 };
 
-// 从 .env 的 LANGUAGE 变量或浏览器语言检测
 function detectLanguage(): 'zh' | 'en' {
   if (typeof window !== 'undefined') {
-    // 检查 URL 参数
     const params = new URLSearchParams(window.location.search);
     if (params.get('lang') === 'zh') return 'zh';
     if (params.get('lang') === 'en') return 'en';
-    // 检查浏览器语言
     if (navigator.language.startsWith('zh')) return 'zh';
   }
-  // 默认通过环境变量，fallback 到中文
   return 'zh';
 }
 
