@@ -129,6 +129,27 @@ export class SessionStore {
     return session;
   }
 
+  /**
+   * Atomically transition session status from one state to another.
+   * Returns true if the transition succeeded, false if the current status
+   * didn't match the expected value (concurrent request already won the race).
+   */
+  tryTransitionStatus(
+    sessionId: string,
+    expected: SessionStatus | SessionStatus[],
+    next: SessionStatus,
+  ): SessionState | undefined {
+    const expectedSet = new Set(Array.isArray(expected) ? expected : [expected]);
+    const session = this.sessions.get(sessionId);
+    if (!session) return undefined;
+    if (!expectedSet.has(session.status)) return undefined;
+    session.status = next;
+    session.updatedAt = Date.now();
+    this.markDirty();
+    logger.info({ sessionId, prevStatus: [...expectedSet], newStatus: next }, 'Status transition (atomic)');
+    return session;
+  }
+
   setDecomposition(sessionId: string, decomposition: any): SessionState | undefined {
     const session = this.sessions.get(sessionId);
     if (!session) return undefined;

@@ -132,23 +132,23 @@ router.post('/sessions/:id/message', async (req: Request, res: Response) => {
     return;
   }
 
-  // Validate session state — block if busy
-  if (session.status === 'decomposing' || session.status === 'executing' || session.status === 'aggregating') {
-    res.status(409).json({ error: 'Session is currently processing. Please wait for it to complete before sending a message.' });
-    return;
-  }
-
   const { message } = req.body;
   if (!message || typeof message !== 'string' || !message.trim()) {
     res.status(400).json({ error: 'message is required' });
     return;
   }
 
-  // Note: do NOT push to session.messages here — orchestrator.continueSession handles that
-  // to avoid double-storing the message.
+  // Atomically claim the session — only allow transition from terminal/idle states
+  const claimed = sessionStore.tryTransitionStatus(
+    id,
+    ['completed', 'failed', 'cancelled', 'awaiting_review', 'timed_out'],
+    'decomposing',
+  );
+  if (!claimed) {
+    res.status(409).json({ error: 'Session is currently processing. Please wait for it to complete before sending a message.' });
+    return;
+  }
 
-  // Re-run orchestrator with the new message as context
-  // Import first, then call synchronously to avoid TOCTOU race
   const { orchestrator } = await import('../services/orchestrator.js');
   orchestrator.continueSession(id, message.trim()).catch(err => {
     logger.error({ sessionId: id, error: err }, 'Continue session failed');
@@ -166,8 +166,13 @@ router.post('/sessions/:id/reconstruct', async (req: Request, res: Response) => 
     return;
   }
 
-  // Guard against concurrent processing
-  if (session.status === 'decomposing' || session.status === 'executing' || session.status === 'aggregating') {
+  // Atomically claim the session — only allow transition from terminal/idle states
+  const claimed = sessionStore.tryTransitionStatus(
+    id,
+    ['completed', 'failed', 'cancelled', 'awaiting_review', 'timed_out'],
+    'decomposing',
+  );
+  if (!claimed) {
     res.status(409).json({ error: 'Session is currently processing. Please wait.' });
     return;
   }

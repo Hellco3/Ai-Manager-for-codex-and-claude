@@ -71,7 +71,12 @@ const SYSTEM_PROMPT = `You are an expert task decomposition engine. Given a user
 - If a subtask is too broad, SPLIT it further
 - If a subtask is trivial, MERGE it with related work
 
-You MUST respond with ONLY valid JSON matching the specified schema. No other text.`;
+You MUST respond with ONLY valid JSON matching the specified schema. No other text.
+
+CRITICAL: Your JSON response MUST include ALL of these top-level fields:
+- "overview" (string): brief overview of your decomposition strategy
+- "subtasks" (array): each subtask MUST have: id (string), kind (one of: code/analysis/design/research/integration), description (string), dependencies (string[]), priority (integer 1-10), estimatedComplexity (one of: low/medium/high)
+- "executionOrder" (string[]): ordered list of all subtask IDs`;
 
 /**
  * Decompose a user task into subtasks via Claude API through CCSwitch.

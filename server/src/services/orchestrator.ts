@@ -50,6 +50,8 @@ class Orchestrator {
       if (error.name === 'AbortError') return;
       logger.error({ sessionId, error }, 'Orchestrator pipeline failed');
       sessionStore.updateStatus(sessionId, 'failed');
+      // Reset any subtasks still marked "running" to prevent stuck state
+      this.resetRunningSubtasks(sessionId);
       sseManager.broadcast(sessionId, { type: 'session:error', error: error.message || 'Unknown error' });
     }
   }
@@ -78,6 +80,7 @@ class Orchestrator {
       if (error.name === 'AbortError') return;
       logger.error({ sessionId, error }, 'Resume pipeline failed');
       sessionStore.updateStatus(sessionId, 'failed');
+      this.resetRunningSubtasks(sessionId);
       sseManager.broadcast(sessionId, { type: 'session:error', error: error.message || 'Unknown error' });
     }
   }
@@ -124,7 +127,7 @@ class Orchestrator {
 
     // Pre-load executor modules once (not inside the while loop)
     const { executeSubtask } = await import('./executor-claude.js');
-    const { executeCodexSubtask } = await import('./executor-codex.js');
+    const { executeCodexSubtask, CodexTimeoutError, CodexNotFoundError } = await import('./executor-codex.js');
     const { selectExecutor, withRetry, isRetryableError } = await import('../utils/retry.js');
 
     const decomposition = session.decomposition!;
@@ -149,7 +152,11 @@ class Orchestrator {
       );
 
       if (ready.length === 0 && inFlight.size === 0) {
-        // Nothing can progress — deadlock or all remaining have unsatisfied deps
+        // Nothing can progress — deadlock, all completed, or all remaining hard-failed
+        if (hardFailed.size > 0 && completed.size + hardFailed.size === subtasks.length) {
+          // All subtasks done (some hard-failed, some completed) — exit cleanly
+          break;
+        }
         if (hardFailed.size > 0) {
           logger.error({
             sessionId,
@@ -191,6 +198,10 @@ class Orchestrator {
           const executorType = selectExecutor(st);
           const startedAt = Date.now();
 
+          // If Codex is the preferred executor but may not be available,
+          // we'll fall back to Claude API on ANY Codex error
+          let actualExecutor: 'codex' | 'claude' = executorType;
+
           // Retry logic: transient errors get up to MAX_RETRIES attempts
           const maxRetries = config.MAX_RETRIES;
           const execResult = await withRetry(
@@ -199,15 +210,37 @@ class Orchestrator {
               let inputTokens = 0;
               let outputTokens = 0;
 
-              if (executorType === 'codex') {
-                result = await executeCodexSubtask(st, signal, (chunk: string) => {
-                  sessionStore.appendSubtaskProgress(sessionId, st.id, chunk);
-                  sseManager.broadcast(sessionId, {
-                    type: 'subtask:progress',
-                    subtaskId: st.id,
-                    chunk,
+              if (actualExecutor === 'codex') {
+                try {
+                  result = await executeCodexSubtask(st, signal, (chunk: string) => {
+                    sessionStore.appendSubtaskProgress(sessionId, st.id, chunk);
+                    sseManager.broadcast(sessionId, {
+                      type: 'subtask:progress',
+                      subtaskId: st.id,
+                      chunk,
+                    });
                   });
-                });
+                } catch (codexErr) {
+                  // ANY Codex error → fall back to Claude API
+                  // (Codex may be unavailable due to network, auth, or missing executable)
+                  logger.warn(
+                    { sessionId, subtaskId: st.id, codexError: String(codexErr) },
+                    'Codex CLI unavailable, falling back to Claude API',
+                  );
+                  actualExecutor = 'claude';
+                  const claudeResult = await executeSubtask(st, results, signal, (chunk: string) => {
+                      sessionStore.appendSubtaskProgress(sessionId, st.id, chunk);
+                      sseManager.broadcast(sessionId, {
+                        type: 'subtask:progress',
+                        subtaskId: st.id,
+                        chunk,
+                      });
+                    });
+                    result = claudeResult.text;
+                    inputTokens = claudeResult.inputTokens;
+                    outputTokens = claudeResult.outputTokens;
+                    return { result, inputTokens, outputTokens };
+                }
               } else {
                 const claudeResult = await executeSubtask(st, results, signal, (chunk: string) => {
                   sessionStore.appendSubtaskProgress(sessionId, st.id, chunk);
@@ -229,8 +262,10 @@ class Orchestrator {
               baseDelayMs: 1000,
               maxDelayMs: 30000,
               isRetryable: (err) => {
-                // Never retry abort signals
+                // Never retry abort signals, timeouts, or Codex-not-found
                 if (err instanceof DOMException && err.name === 'AbortError') return false;
+                if (err instanceof CodexTimeoutError) return false;
+                if (err instanceof CodexNotFoundError) return false;
                 return isRetryableError(err);
               },
               onRetry: (attempt, err) => {
@@ -265,12 +300,24 @@ class Orchestrator {
             durationMs,
           });
 
-          // Track cost with real token counts
-          const executorModel = executorType === 'codex' ? 'codex-cli' : config.EXECUTOR_MODEL;
+          // Track cost with the actual executor that ran (may differ from preferred)
+          const executorModel = actualExecutor === 'codex' ? 'codex-cli' : config.EXECUTOR_MODEL;
           const stats = costTracker.addEntry(executorModel, execResult.inputTokens, execResult.outputTokens, durationMs);
           sseManager.broadcast(sessionId, { type: 'cost:update', stats });
         } catch (error: any) {
           if (error.name === 'AbortError') throw error;
+
+          // Codex timeout: emit the correct event type
+          if (error instanceof CodexTimeoutError) {
+            hardFailed.add(st.id);
+            sessionStore.setSubtaskError(sessionId, st.id, error.message);
+            sseManager.broadcast(sessionId, {
+              type: 'subtask:timed_out',
+              subtaskId: st.id,
+              durationMs: Date.now() - (session.subtaskStates?.[st.id]?.startedAt ?? Date.now()),
+            });
+            return;
+          }
 
           // All retries exhausted — mark as hard failure
           const retryable = isRetryableError(error);
@@ -317,7 +364,13 @@ class Orchestrator {
     const totalCost = costTracker.getTotalCost();
     const totalDurationMs = costTracker.getTotalDuration();
 
-    const summary = `Task completed. ${Object.keys(subtaskResults).length} subtasks executed.`;
+    // Count completed vs failed subtasks
+    const completedCount = Object.values(session.subtaskStates!).filter(s => s.status === 'completed').length;
+    const failedCount = Object.values(session.subtaskStates!).filter(s => s.status === 'failed' || s.status === 'timed_out').length;
+
+    const summary = completedCount > 0
+      ? `Task completed. ${completedCount} subtask(s) succeeded, ${failedCount} failed.`
+      : `Task failed: all ${failedCount} subtask(s) failed.`;
 
     const result = {
       summary,
@@ -348,6 +401,18 @@ class Orchestrator {
       this.activeRuns.delete(sessionId);
     }
     logger.info({ sessionId }, 'Session cancelled - orchestrator aborting');
+  }
+
+  /** Reset subtasks still marked "running" to "failed" after an orchestrator crash */
+  private resetRunningSubtasks(sessionId: string): void {
+    const session = sessionStore.get(sessionId);
+    if (!session?.subtaskStates) return;
+    for (const [id, state] of Object.entries(session.subtaskStates)) {
+      if (state.status === 'running') {
+        sessionStore.setSubtaskError(sessionId, id, 'Orchestrator pipeline failed');
+        logger.info({ sessionId, subtaskId: id }, 'Reset stuck running subtask to failed');
+      }
+    }
   }
 
   /** Continue a session with a follow-up message */
@@ -419,6 +484,7 @@ class Orchestrator {
       if (error.name === 'AbortError') return;
       logger.error({ sessionId, error }, 'Continue session failed');
       sessionStore.updateStatus(sessionId, 'failed');
+      this.resetRunningSubtasks(sessionId);
       sseManager.broadcast(sessionId, { type: 'session:error', error: error.message || 'Unknown error' });
       // Clean up bookkeeping so stale entries don't leak
       this.activeRuns.delete(sessionId);
@@ -555,6 +621,7 @@ CRITICAL: Keep responses brief (2-4 sentences). The system handles execution —
       if (error.name === 'AbortError') return;
       logger.error({ sessionId, error }, 'Reconstruct session failed');
       sessionStore.updateStatus(sessionId, 'failed');
+      this.resetRunningSubtasks(sessionId);
       sseManager.broadcast(sessionId, { type: 'session:error', error: error.message || 'Unknown error' });
       this.activeRuns.delete(sessionId);
     }

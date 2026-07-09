@@ -3,6 +3,22 @@ import { type Subtask } from '@ai_manager/shared';
 import { config } from '../config.js';
 import { logger } from '../utils/logger.js';
 
+/** Specific error class for Codex CLI timeouts — allows the orchestrator to emit subtask:timed_out */
+export class CodexTimeoutError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = 'CodexTimeoutError';
+  }
+}
+
+/** Specific error class for Codex CLI not found — allows orchestrator to fall back to Claude API */
+export class CodexNotFoundError extends Error {
+  constructor(codexPath: string) {
+    super(`Codex CLI not found at "${codexPath}". Is Codex installed?`);
+    this.name = 'CodexNotFoundError';
+  }
+}
+
 function killProcess(proc: ChildProcess, signal: NodeJS.Signals = 'SIGTERM'): Promise<void> {
   return new Promise(resolve => {
     const forceKillTimer = setTimeout(() => {
@@ -43,60 +59,63 @@ export async function executeCodexSubtask(
     const proc = spawn(codexPath, [
       'exec',
       '--skip-git-repo-check',
-      '--output-format', 'text',
-      '--approval', 'never',
+      '--json',
+      '--dangerously-bypass-approvals-and-sandbox',
       '--model', 'claude-sonnet-5',
+      '--',
       `[CODING TASK] ${subtask.description}\n\nProvide your complete implementation with code. No explanations unless strictly necessary.`,
     ], {
-      stdio: ['ignore', 'pipe', 'pipe'],
+      stdio: ['pipe', 'pipe', 'pipe'],
+      shell: process.platform === 'win32',
       env: {
         ...process.env,
         ANTHROPIC_API_KEY: config.ANTHROPIC_API_KEY,
       },
-      // No timeout at the spawn level — we manage it ourselves
     });
 
-    let stdout = '';
-    let stderr = '';
+	let stdout = '';
+	let stderr = '';
+	let jsonEvents: string[] = [];
 
-    // Watch for abort signal from orchestrator
-    const onAbort = () => {
-      killProcess(proc).then(() => {
-        reject(new DOMException(`Codex subtask cancelled`, 'AbortError'));
-      });
-    };
-    signal.addEventListener('abort', onAbort, { once: true });
+	// Watch for abort signal from orchestrator
+	const onAbort = () => {
+	  killProcess(proc).then(() => {
+	    reject(new DOMException(`Codex subtask cancelled`, 'AbortError'));
+	  });
+	};
+	signal.addEventListener('abort', onAbort, { once: true });
 
-    // If already aborted before we started, don't spawn
-    if (signal.aborted) {
-      reject(new DOMException('Subtask cancelled before start', 'AbortError'));
-      return;
-    }
+	// If already aborted before we started, don't spawn
+	if (signal.aborted) {
+	  reject(new DOMException('Subtask cancelled before start', 'AbortError'));
+	  return;
+	}
 
-    const timeoutMs = config.CODEX_TIMEOUT_MS;
-    const timeoutTimer = setTimeout(async () => {
-      logger.warn({ subtaskId: subtask.id, timeoutMs }, 'Codex CLI timeout — terminating');
-      await killProcess(proc);
-      reject(new Error(`Codex CLI timed out after ${timeoutMs}ms for subtask: ${subtask.id}`));
-    }, timeoutMs);
+	const timeoutMs = config.CODEX_TIMEOUT_MS;
+	const timeoutTimer = setTimeout(async () => {
+	  logger.warn({ subtaskId: subtask.id, timeoutMs }, 'Codex CLI timeout — terminating');
+	  await killProcess(proc);
+	  reject(new CodexTimeoutError(`Codex CLI timed out after ${timeoutMs}ms for subtask: ${subtask.id}`));
+	}, timeoutMs);
 
-    proc.stdout?.on('data', (chunk: Buffer) => {
-      const text = chunk.toString('utf-8');
-      stdout += text;
-      onProgress(text);
-    });
+	proc.stdout?.on('data', (chunk: Buffer) => {
+	  const text = chunk.toString('utf-8');
+	  stdout += text;
+	  // Codex --json mode emits JSONL events; pass text chunks for progress
+	  onProgress(text);
+	});
 
-    proc.stderr?.on('data', (chunk: Buffer) => {
-      const text = chunk.toString('utf-8');
-      stderr += text;
-      onProgress(text);
-    });
+	proc.stderr?.on('data', (chunk: Buffer) => {
+	  const text = chunk.toString('utf-8');
+	  stderr += text;
+	  onProgress(text);
+	});
 
     proc.on('error', (err: Error) => {
       clearTimeout(timeoutTimer);
-      // Check if Codex CLI exists
+      // Check if Codex CLI exists — use a typed error so orchestrator can fall back
       if ((err as NodeJS.ErrnoException).code === 'ENOENT') {
-        reject(new Error(`Codex CLI not found at "${codexPath}". Is Codex installed?`));
+        reject(new CodexNotFoundError(codexPath));
       } else {
         reject(new Error(`Codex CLI process error: ${err.message}`));
       }
@@ -108,8 +127,8 @@ export async function executeCodexSubtask(
 
       if (code === 0) {
         logger.info({ subtaskId: subtask.id, outputLength: stdout.length }, 'Codex CLI completed');
-        // Clean up the Codex header/status lines from stdout
-        const cleaned = cleanCodexOutput(stdout);
+        // Codex --json mode outputs JSONL; extract final text from events
+        const cleaned = processCodexJsonOutput(stdout);
         resolve(cleaned);
       } else if (sig) {
         reject(new Error(`Codex CLI killed by signal ${sig} for subtask: ${subtask.id}`));
@@ -123,7 +142,58 @@ export async function executeCodexSubtask(
 }
 
 /**
+ * Process Codex CLI --json output (JSONL format).
+ * Extracts the final assistant message text.
+ */
+function processCodexJsonOutput(output: string): string {
+  const lines = output.split('\n');
+  const messages: string[] = [];
+
+  for (const line of lines) {
+    const trimmed = line.trim();
+    if (!trimmed) continue;
+    try {
+      const event = JSON.parse(trimmed);
+      // Extract text from assistant message events
+      if (event.type === 'assistant' && event.message?.content) {
+        for (const block of event.message.content) {
+          if (block.type === 'text' && block.text) {
+            messages.push(block.text);
+          }
+        }
+      }
+      // Also capture result from final output events
+      if (event.type === 'result' && event.result) {
+        messages.push(event.result);
+      }
+      // Capture code output from tool_use events
+      if (event.type === 'tool_use' && event.content) {
+        for (const block of event.content) {
+          if (block.type === 'text' && block.text) {
+            messages.push(block.text);
+          }
+        }
+      }
+    } catch {
+      // Not JSON — probably a plain text line, include it
+      messages.push(trimmed);
+    }
+  }
+
+  const result = messages.join('\n').trim();
+
+  // If JSON parsing yielded nothing, fall back to plain text output
+  if (!result) {
+    // Just return all non-empty lines concatenated
+    return output.split('\n').filter(l => l.trim()).join('\n').trim();
+  }
+
+  return result;
+}
+
+/**
  * Clean up Codex CLI output headers (model info, tokens used, etc.).
+ * @deprecated Use processCodexJsonOutput for --json mode; kept as fallback.
  */
 function cleanCodexOutput(output: string): string {
   const lines = output.split('\n');
