@@ -780,7 +780,30 @@ class Orchestrator {
       // Phase 1: Decompose
       this.broadcastStage(sessionId, 'stage:started', 'decompose');
       const { decomposeTask } = await import('./decomposer.js');
-      const { decomposition, inputTokens, outputTokens } = await decomposeTask(contextTask);
+
+      let decompositionResult: { decomposition: any; inputTokens: number; outputTokens: number };
+      try {
+        decompositionResult = await Promise.race([
+          decomposeTask(contextTask),
+          new Promise<never>((_, reject) =>
+            setTimeout(() => reject(new Error('Decomposition timed out after 60s')), 60000),
+          ),
+        ]);
+      } catch (err: any) {
+        logger.error({ sessionId, error: err }, 'Decomposition failed');
+        sseManager.broadcast(sessionId, {
+          type: 'message:complete',
+          content: `任务拆解失败：${err.message || '超时'}。请稍后重试或简化任务描述。`,
+          role: 'system',
+          timestamp: Date.now(),
+        });
+        sessionStore.addMessage(sessionId, 'system', `任务拆解失败：${err.message || '超时'}。请稍后重试或简化任务描述。`);
+        sessionStore.updateStatus(sessionId, 'chatting');
+        this.activeRuns.delete(sessionId);
+        return;
+      }
+
+      const { decomposition, inputTokens, outputTokens } = decompositionResult;
       sessionStore.setDecomposition(sessionId, decomposition);
       this.broadcastStage(sessionId, 'stage:completed', 'decompose');
 
