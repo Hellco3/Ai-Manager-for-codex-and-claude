@@ -15,6 +15,7 @@ interface StageEntry {
 }
 
 interface ChatMessage {
+  id?: string;
   role: string;
   content: string;
   timestamp: number;
@@ -448,6 +449,10 @@ export const usePipelineStore = create<PipelineStore>((set, get) => ({
           isComplete: true,
           isError: false,
           errorMessage: null,
+          statusMessage: null,
+          statusStep: null,
+          statusProgress: 100,
+          statusStartedAt: null,
           currentStage: 'aggregate',
           costStats: event.result.costBreakdown,
           totalCost: event.result.totalCost,
@@ -466,6 +471,10 @@ export const usePipelineStore = create<PipelineStore>((set, get) => ({
           isComplete: false,
           isError: true,
           errorMessage: event.error,
+          statusMessage: null,
+          statusStep: null,
+          statusProgress: 0,
+          statusStartedAt: null,
           stages: {
             ...get().stages,
             [get().currentStage ?? 'execute']: { ...get().stages[get().currentStage ?? 'execute'], status: 'failed' },
@@ -510,6 +519,7 @@ export const usePipelineStore = create<PipelineStore>((set, get) => ({
               role: msgEvent.role,
               content: msgEvent.content,
               timestamp: msgEvent.timestamp,
+              id: msgEvent.id,
               attachmentIds: msgEvent.attachmentIds,
             }],
           };
@@ -562,6 +572,7 @@ export const usePipelineStore = create<PipelineStore>((set, get) => ({
   // Chat actions
   addUserMessage: (message, attachmentIds) => set((s) => ({
     messages: [...s.messages, {
+      id: `local-user-${Date.now()}`,
       role: 'user',
       content: message,
       timestamp: Date.now(),
@@ -592,6 +603,7 @@ export const usePipelineStore = create<PipelineStore>((set, get) => ({
       isStreaming: false,
       streamingContent: '',
       messages: [...s.messages, {
+        id: `stream-${timestamp}`,
         role,
         content: s.streamingContent,
         timestamp,

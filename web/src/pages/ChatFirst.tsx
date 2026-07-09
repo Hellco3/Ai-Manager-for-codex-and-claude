@@ -4,7 +4,7 @@ import { usePipelineStore } from '../store/pipeline-store.js';
 import { useSessionStore } from '../store/session-store.js';
 import { useSSE } from '../hooks/useSSE.js';
 import { postTask, sendMessage, confirmTask, updateWorkspace, getTask } from '../api/client.js';
-import { t } from '../i18n.js';
+import { langName, t } from '../i18n.js';
 import ChatMessage from '../components/chat/ChatMessage.js';
 import ChatInput from '../components/chat/ChatInput.js';
 import WorkspaceSelector from '../components/chat/WorkspaceSelector.js';
@@ -16,6 +16,7 @@ import TimePanel from '../components/stats/TimePanel.js';
 import { useUploadStore } from '../store/upload-store.js';
 
 export default function ChatFirst() {
+  const isZh = langName === 'zh';
   const navigate = useNavigate();
   const messages = usePipelineStore((s) => s.messages);
   const isStreaming = usePipelineStore((s) => s.isStreaming);
@@ -63,6 +64,20 @@ export default function ChatFirst() {
       }
     })();
   }, [sessionId, hydrated, hydrateFromSession]);
+
+  useEffect(() => {
+    if (!sessionId || decomposition || !currentStage) return;
+
+    const timer = window.setTimeout(async () => {
+      try {
+        const session = await getTask(sessionId);
+        hydrateFromSession(session);
+      } catch {
+      }
+    }, 1200);
+
+    return () => window.clearTimeout(timer);
+  }, [sessionId, currentStage, decomposition, hydrateFromSession]);
 
   const scrollToBottom = useCallback((force = false) => {
     const el = containerRef.current;
@@ -173,6 +188,13 @@ export default function ChatFirst() {
     setSendError(null);
     try {
       await confirmTask(sessionId, undefined, workspaceDir ?? undefined);
+      window.setTimeout(async () => {
+        try {
+          const session = await getTask(sessionId);
+          hydrateFromSession(session);
+        } catch {
+        }
+      }, 1200);
       setIsMobilePanelOpen(false);
     } catch (err: any) {
       setSendError(err.message || t.chat.error);
@@ -200,23 +222,28 @@ export default function ChatFirst() {
   };
 
   const hasPipelineStarted = !!currentStage && currentStage !== 'decompose' && Object.keys(subtasks).length > 0;
-  const showConfirm = !!sessionId && !hasPipelineStarted && !isComplete;
+  const hasExecutionActivity = !!currentStage || !!decomposition || !!statusMessage;
+  const showConfirm = !!sessionId && !hasExecutionActivity && !isComplete;
   const showDecomposition = !!decomposition && (currentStage === 'decompose' || currentStage === 'execute' || currentStage === 'aggregate' || hasPipelineStarted || isComplete);
   const stageLabels = t.stages;
   const stageIcons: Record<string, string> = { decompose: 'D', review: 'R', execute: 'E', aggregate: 'A' };
+  const executionLabel = isZh ? '执行面板' : 'Execution';
+  const closeExecutionLabel = isZh ? '关闭执行面板' : 'Close execution panel';
+  const hidePanelLabel = isZh ? '收起面板' : 'Hide Panel';
+  const showPanelLabel = isZh ? '展开面板' : 'Show Panel';
 
   const renderExecutionPanel = () => (
     <div className="panel-surface flex h-full flex-col">
       <div className="flex items-center justify-between border-b border-slate-700/60 px-4 py-4">
         <div>
-          <div className="panel-badge">Execution</div>
+          <div className="panel-badge">{executionLabel}</div>
           <p className="mt-2 text-sm font-medium text-slate-100">{t.progress.title}</p>
         </div>
         <button
           type="button"
           onClick={() => setIsMobilePanelOpen(false)}
           className="icon-button h-10 w-10 rounded-full md:hidden"
-          aria-label="Close execution panel"
+          aria-label={closeExecutionLabel}
         >
           <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M6 18L18 6M6 6l12 12" />
@@ -378,14 +405,14 @@ export default function ChatFirst() {
             onClick={() => setIsPanelOpen((open) => !open)}
             className="surface-chip hidden md:inline-flex"
           >
-            {isPanelOpen ? 'Hide Panel' : 'Show Panel'}
+            {isPanelOpen ? hidePanelLabel : showPanelLabel}
           </button>
           <button
             type="button"
             onClick={() => setIsMobilePanelOpen(true)}
             className="surface-chip md:hidden"
           >
-            Execution
+            {executionLabel}
           </button>
           {sessionId && (
             <button
@@ -491,9 +518,9 @@ export default function ChatFirst() {
               type="button"
               onClick={() => setIsPanelOpen(true)}
               className="panel-surface flex h-full min-h-[560px] w-12 items-center justify-center rounded-[24px] border text-slate-300 transition-colors hover:text-slate-100"
-              aria-label="Show execution panel"
+              aria-label={showPanelLabel}
             >
-              <span className="[writing-mode:vertical-rl] text-[11px] uppercase tracking-[0.24em]">Execution</span>
+              <span className="[writing-mode:vertical-rl] text-[11px] uppercase tracking-[0.24em]">{executionLabel}</span>
             </button>
           </aside>
         )}
@@ -516,7 +543,7 @@ export default function ChatFirst() {
           type="button"
           onClick={() => setIsMobilePanelOpen(false)}
           className="mx-auto mt-3 flex w-full items-center justify-center pb-2"
-          aria-label="Close execution panel"
+          aria-label={closeExecutionLabel}
         >
           <span className="drawer-handle h-1.5 w-14 rounded-full" />
         </button>
