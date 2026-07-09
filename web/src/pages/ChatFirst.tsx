@@ -129,6 +129,13 @@ export default function ChatFirst() {
       addUserMessage(message, attachmentIds.length > 0 ? attachmentIds : undefined);
       try {
         await confirmTask(sessionId, undefined, workspaceDir ?? undefined);
+        window.setTimeout(async () => {
+          try {
+            const session = await getTask(sessionId);
+            hydrateFromSession(session);
+          } catch {
+          }
+        }, 1200);
         setIsMobilePanelOpen(false);
       } catch (err: any) {
         setSendError(err.message || t.chat.error);
