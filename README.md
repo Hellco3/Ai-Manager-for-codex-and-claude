@@ -1,24 +1,40 @@
 # AI Manager for Codex & Claude
 
-AI 任务编排平台 — 提交任务后，Claude 自动拆解为子任务，分发给 Codex CLI 和 Claude API 并行执行，前端实时展示泳道式进度。
+AI 任务编排平台 — 以对话方式启动，Claude 主代理与你讨论需求后自动拆解为子任务，分发给 Codex CLI 和 Claude API 并行执行，前端实时展示泳道式进度。
 
 ## 架构
 
 ```
-用户提交任务 → React Frontend → POST /api/tasks
+用户 → 聊天界面 (ChatFirst) → POST /api/tasks (chat-first)
                                     ↓
+                              主代理对话 (chatFirstPhase)
+                              ↓ 用户点击「开始任务」
                               Orchestrator (编排引擎)
                               ├── Decomposer (Claude Opus 拆解)
-                              ├── [半自动模式: 等待用户审核]
                               ├── Executors (并行执行)
                               │   ├── Claude API (分析/设计/研究)
-                              │   └── Codex CLI (编码/集成)
+                              │   └── Codex CLI (编码/集成, --cd 指定目录)
                               └── Aggregator (结果聚合)
                                     ↓
-                              SSE Manager → 实时推送进度
+                              主代理在聊天中流式汇报结果
                                     ↓
-                              React SwimLane UI (泳道可视化)
+                              用户反馈 → 重新拆解执行 (循环)
 ```
+
+## 交互流程
+
+```
+首页聊天 ──→ 讨论需求 ──→ 点击「开始任务」──→ 拆解 + 执行 ──→ 代理汇报 ──→ 反馈循环
+    ↑                                                                    │
+    └────────────────────────────────────────────────────────────────────┘
+```
+
+1. 打开首页直接进入聊天界面，无需填表单
+2. 与 AI 主代理讨论项目需求（可指定项目文件夹）
+3. 需求明确后点击「开始任务」，AI 自动拆解并执行
+4. 执行进度以系统消息内联显示在聊天中
+5. 完成后 AI 在聊天中流式汇报结果
+6. 用户可继续对话反馈，触发新一轮拆解执行
 
 ## 项目结构
 
@@ -36,15 +52,17 @@ ai_manager/
 │       │   └── aggregator.ts      # 结果聚合
 │       ├── sse/manager.ts         # SSE 连接管理 + 断线重播
 │       ├── store/session-store.ts # 会话存储 (内存 + 文件持久化 + 原子状态转换)
-│       ├── queue/task-queue.ts    # 任务队列
 │       ├── routes/tasks.ts        # REST API 路由
 │       └── utils/                 # 重试 / 超时 / 日志 / 成本追踪
 ├── web/             # React 19 + Vite + Tailwind CSS 前端
 │   └── src/
-│       ├── pages/          # TaskSubmit (提交) / TaskProgress (进度 + 对话)
+│       ├── pages/
+│       │   ├── ChatFirst.tsx       # 聊天优先首页 (默认)
+│       │   ├── TaskSubmit.tsx      # 传统表单提交 (/submit)
+│       │   └── TaskProgress.tsx   # 任务进度 + 对话侧边栏
 │       ├── components/
 │       │   ├── pipeline/   # SwimLane / PipelineView / SubtaskList / LogDrawer
-│       │   ├── chat/       # ChatPanel / ChatMessage / ChatInput (多轮对话)
+│       │   ├── chat/       # ChatPanel / ChatMessage / ChatInput / WorkspaceSelector
 │       │   ├── task/       # TaskForm / DecompositionReview
 │       │   ├── stats/      # CostPanel / TimePanel
 │       │   └── common/     # StatusBadge / ThemeToggle
@@ -55,12 +73,14 @@ ai_manager/
 
 ## 功能
 
-- **智能拆解**: Claude Opus 4.8 分析任务，JSON Schema 结构化输出子任务，内置 LLM 输出归一化修复常见格式问题
+- **聊天优先**: 首页直接对话，无需填表单，AI 主代理与你讨论需求
+- **智能拆解**: Claude Opus 4.8 分析任务，JSON Schema 结构化输出子任务，内置 LLM 输出归一化
 - **并行执行**: DAG 依赖解析，最大 5 并发，Claude API + Codex CLI 双引擎，失败自动重试（最多 3 次）
-- **实时进度**: SSE 推送，泳道式 UI 展示 Claude/Codex 并行任务流
-- **多轮对话**: 任务完成后可在聊天面板中继续对话，AI 流式回复后重新拆解并执行新的子任务
+- **项目目录指定**: 聊天界面可指定 Codex 工作目录（`--cd`），Codex 在该目录创建/修改文件
+- **实时进度**: SSE 推送，泳道式 UI 展示 Claude/Codex 并行任务流，执行进度内联显示在聊天中
+- **多轮对话循环**: 执行完毕后 AI 流式汇报 → 用户反馈 → 重新拆解执行 → 持续迭代
 - **流式 AI 回复**: SSE 实时推送 AI 的对话响应（逐字流式输出），带输入中动画
-- **双模式**: 全自动（一键执行）/ 半自动（先审核拆解再执行）
+- **双模式**: 聊天优先（默认）/ 传统表单（`/submit`）/ 半自动审核
 - **主题切换**: 暗色 / 亮色模式切换，持久化到 localStorage
 - **移动端适配**: 对话面板在移动端自动切换为底部抽屉 + 悬浮操作按钮（FAB）
 - **成本追踪**: Token 消耗 + 耗时统计，按模型分开展示
@@ -71,13 +91,14 @@ ai_manager/
 ```bash
 # 1. 配置环境变量
 cp .env.example .env
-# 无需 API Key — 复用 CCSwitch 代理，自动使用 PROXY_MANAGED
+# 无需 API Key — 复用 CCSwitch 代理
 
 # 2. 启动
 npm run dev
 
 # 3. 浏览器访问
-# http://localhost:5173
+# http://localhost:5173 (聊天优先首页)
+# http://localhost:5173/submit (传统表单)
 ```
 
 ## 命令
@@ -93,29 +114,24 @@ npm run test:web     # 仅运行前端测试
 
 | Method | Path | Description |
 |--------|------|-------------|
-| POST | `/api/tasks` | 提交任务 → 返回 sessionId |
-| GET | `/api/tasks/:id` | 查询任务状态 + 对话历史 + 成本统计 |
+| POST | `/api/tasks` | 提交任务（支持 `chat-first` / `auto` / `semi-auto` 模式 + `workspaceDir`） |
+| GET | `/api/tasks/:id` | 查询任务状态 + 对话历史 + 成本统计 + 工作目录 |
 | POST | `/api/tasks/:id/approve` | 半自动模式确认拆解 |
 | POST | `/api/tasks/:id/cancel` | 取消任务（终止进程） |
-| POST | `/api/sessions/:id/message` | 发送跟进消息（多轮对话），原子状态转换防并发 |
+| POST | `/api/sessions/:id/message` | 发送跟进消息（多轮对话） |
 | POST | `/api/sessions/:id/reconstruct` | 重新规划未完成的子任务 |
+| POST | `/api/sessions/:id/confirm` | 聊天优先：确认需求，触发拆解执行 |
+| POST | `/api/sessions/:id/workspace` | 更新项目工作目录 |
 | GET | `/api/sessions/:id/stream` | SSE 实时进度流 |
-
-## 多轮对话
-
-任务完成后，可在右侧（桌面端）或底部抽屉（移动端）打开对话面板：
-
-1. 在输入框中输入跟进消息（如"增加错误处理"、"优化性能"）
-2. AI 先流式回复你的问题，然后重新拆解并执行新的子任务
-3. 所有对话历史保存在会话中，刷新页面后依然可见
-4. 点击"重新规划"按钮可基于当前状态重新分析
 
 ## 任务生命周期
 
 ```
-DECOMPOSING → [AWAITING_REVIEW (semi-auto)] → EXECUTING → AGGREGATING → COMPLETED
-                                                                         ↓
-                                                                       FAILED
+CHATTING → (用户点击开始任务) → DECOMPOSING → EXECUTING → AGGREGATING → COMPLETED
+    ↑         ↓                                                             │
+    └── 对话讨论                                                    FAILED  │
+                                                                           │
+    用户反馈 → [POST /message] → 继续对话 / 重新拆解 ←──────────────────────┘
 ```
 
 子任务状态: `pending → queued → running → completed / failed / timed_out / cancelled`
@@ -143,6 +159,7 @@ DECOMPOSING → [AWAITING_REVIEW (semi-auto)] → EXECUTING → AGGREGATING → 
 | `DECOMPOSER_MODEL` | `claude-opus-4-8` | 拆解模型 |
 | `EXECUTOR_MODEL` | `claude-sonnet-5` | 执行 + 对话模型 |
 | `CODEX_CLI_PATH` | `codex` | Codex CLI 路径 |
+| `CODEX_MODEL` | `claude-sonnet-5` | Codex 使用的模型 |
 | `CODEX_TIMEOUT_MS` | `300000` | Codex 执行超时 (ms) |
 | `MAX_CONCURRENT_SUBTASKS` | `5` | 最大并行子任务数 |
 | `MAX_RETRIES` | `3` | 子任务失败最大重试次数 |
@@ -156,6 +173,7 @@ DECOMPOSING → [AWAITING_REVIEW (semi-auto)] → EXECUTING → AGGREGATING → 
 |---|------|
 | 后端 | Node.js + TypeScript + Express 5 |
 | AI | @anthropic-ai/sdk (Opus 4.8 / Sonnet 5 via CCSwitch) |
+| Codex | Codex CLI 0.143+ (JSON mode, `--cd` workspace) |
 | 前端 | React 19 + Vite + Tailwind CSS 4 |
 | 状态 | Zustand |
 | 动画 | Framer Motion |
