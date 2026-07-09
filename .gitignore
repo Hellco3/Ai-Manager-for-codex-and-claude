@@ -7,3 +7,4 @@ data/
 web/dist/
 server/dist/
 *.tsbuildinfo
+.ccb/
