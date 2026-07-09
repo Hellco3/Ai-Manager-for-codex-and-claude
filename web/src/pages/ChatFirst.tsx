@@ -401,11 +401,11 @@ export default function ChatFirst() {
         </div>
       </div>
 
-      {/* Grid: right panel expands from 344px to 420px when pipeline starts */}
+      {/* Grid: right panel is initially narrow (344px), expands to 420px when decomposition + pipeline data become available */}
       <div
         className={`grid gap-4 transition-[grid-template-columns] duration-500 ease-out ${
           isPanelOpen
-            ? hasPipelineStarted
+            ? showDecomposition && decomposition
               ? 'md:grid-cols-[minmax(0,1fr)_420px]'
               : 'md:grid-cols-[minmax(0,1fr)_344px]'
             : 'md:grid-cols-[minmax(0,1fr)_48px]'
