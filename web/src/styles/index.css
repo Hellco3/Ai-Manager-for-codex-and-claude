@@ -2,6 +2,11 @@
 
 @layer base {
   :root {
+    --chat-bg: #020617;
+    --panel-bg: #172033;
+    --accent: #a855f7;
+    --success: #10b981;
+    --danger: #ef4444;
     --color-pending: #94a3b8;
     --color-running: #60a5fa;
     --color-completed: #34d399;
@@ -10,24 +15,34 @@
     --color-cancelled: #a78bfa;
   }
 
+  html {
+    color-scheme: dark;
+  }
+
   body {
     font-family: 'Inter', system-ui, -apple-system, sans-serif;
-    background: linear-gradient(135deg, #0f172a 0%, #1e293b 100%);
+    background:
+      radial-gradient(circle at top, rgba(168, 85, 247, 0.08), transparent 34%),
+      linear-gradient(180deg, #020617 0%, #0f172a 55%, #111827 100%);
+    color: #e2e8f0;
     min-height: 100vh;
   }
 
-  /* Subtle grid background */
+  button,
+  [role='button'] {
+    -webkit-tap-highlight-color: transparent;
+  }
+
   .bg-grid {
     background-image:
-      linear-gradient(rgba(148, 163, 184, 0.03) 1px, transparent 1px),
-      linear-gradient(90deg, rgba(148, 163, 184, 0.03) 1px, transparent 1px);
+      linear-gradient(rgba(148, 163, 184, 0.025) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(148, 163, 184, 0.025) 1px, transparent 1px);
     background-size: 40px 40px;
   }
 
-  /* Light theme overrides */
   .light body,
   .light {
-    background: linear-gradient(135deg, #f8fafc 0%, #e2e8f0 100%);
+    background: linear-gradient(180deg, #f8fafc 0%, #e2e8f0 100%);
   }
 
   .light .bg-grid {
@@ -37,12 +52,12 @@
   }
 
   .light .stage-card {
-    background: rgba(255, 255, 255, 0.8);
+    background: rgba(255, 255, 255, 0.82);
     border-color: rgba(203, 213, 225, 0.5);
   }
 
   .light .stage-card:hover {
-    background: rgba(255, 255, 255, 0.95);
+    background: rgba(255, 255, 255, 0.94);
   }
 
   .light .stage-card.active {
@@ -65,10 +80,7 @@
     color: #64748b;
   }
 
-  .light .text-slate-500 {
-    color: #94a3b8;
-  }
-
+  .light .text-slate-500,
   .light .text-slate-600 {
     color: #94a3b8;
   }
@@ -88,19 +100,37 @@
   .status-cancelled { background-color: var(--color-cancelled); }
 
   .stage-card {
-    @apply relative rounded-xl border border-slate-700/50 bg-slate-800/50 backdrop-blur-sm p-6 transition-all duration-300;
+    @apply relative rounded-2xl border border-slate-700/60 bg-slate-900/55 backdrop-blur-xl p-6 transition-colors duration-200;
+    box-shadow: 0 22px 50px rgba(2, 6, 23, 0.28);
   }
 
   .stage-card:hover {
-    @apply border-slate-600/50 bg-slate-800/70 shadow-lg shadow-blue-500/5;
+    @apply border-slate-600/70 bg-slate-900/68;
   }
 
   .stage-card.active {
-    @apply border-blue-500/50 bg-slate-800/80 shadow-xl shadow-blue-500/10;
+    @apply border-purple-500/35 bg-slate-900/78;
+    box-shadow: 0 24px 60px rgba(2, 6, 23, 0.36), 0 0 0 1px rgba(168, 85, 247, 0.08);
   }
 
   .gradient-text {
-    @apply bg-gradient-to-r from-blue-400 to-purple-400 bg-clip-text text-transparent;
+    @apply bg-gradient-to-r from-slate-100 to-slate-400 bg-clip-text text-transparent;
+  }
+
+  .chat-shell {
+    background:
+      linear-gradient(180deg, rgba(15, 23, 42, 0.96), rgba(2, 6, 23, 0.94)),
+      rgba(2, 6, 23, 0.88);
+  }
+
+  .panel-surface {
+    background:
+      linear-gradient(180deg, rgba(23, 32, 51, 0.92), rgba(15, 23, 42, 0.88)),
+      rgba(23, 32, 51, 0.88);
+  }
+
+  .panel-badge {
+    @apply inline-flex items-center rounded-full border border-purple-500/20 bg-purple-500/12 px-2.5 py-1 text-[11px] font-medium text-purple-200;
   }
 }
 
@@ -114,49 +144,67 @@
   to { opacity: 1; }
 }
 
-/* Custom scrollbar */
-.chat-scroll::-webkit-scrollbar { width: 6px; }
-.chat-scroll::-webkit-scrollbar-track { background: transparent; }
-.chat-scroll::-webkit-scrollbar-thumb { background: rgba(148, 163, 184, 0.2); border-radius: 3px; }
-.chat-scroll::-webkit-scrollbar-thumb:hover { background: rgba(148, 163, 184, 0.3); }
+.chat-scroll::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
 
-/* File preview card */
+.chat-scroll::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.chat-scroll::-webkit-scrollbar-thumb {
+  background: rgba(100, 116, 139, 0.28);
+  border-radius: 9999px;
+}
+
+.chat-scroll::-webkit-scrollbar-thumb:hover {
+  background: rgba(148, 163, 184, 0.38);
+}
+
 .file-card {
-  @apply flex items-center gap-2 px-2 py-1.5 rounded-lg bg-slate-800/50 border border-slate-700/30 transition-all hover:border-slate-600/50 hover:bg-slate-800/70 cursor-default;
+  @apply flex min-w-0 items-center gap-3 rounded-2xl border border-slate-700/50 bg-slate-900/72 px-3 py-2 text-left transition-colors duration-200;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.02);
 }
 
-/* Drag overlay */
+.file-card:hover {
+  @apply border-slate-600/65 bg-slate-900/84;
+}
+
 .drag-overlay {
-  background: rgba(59, 130, 246, 0.05);
-  border: 2px dashed rgba(59, 130, 246, 0.4);
-  border-radius: 0.75rem;
-  backdrop-filter: blur(4px);
-  animation: fadeIn 0.15s ease-out;
+  background: rgba(15, 23, 42, 0.9);
+  border: 1px dashed rgba(168, 85, 247, 0.42);
+  border-radius: 1rem;
+  backdrop-filter: blur(12px);
 }
 
-/* Lightbox backdrop */
 .lightbox-backdrop {
-  @apply fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center cursor-pointer;
-  animation: fadeIn 0.2s ease-out;
+  @apply fixed inset-0 z-50 flex items-center justify-center bg-slate-950/90 px-4 py-4 backdrop-blur-sm;
+  animation: fadeIn 0.18s ease-out;
 }
 
-/* Streaming cursor */
 .streaming-cursor::after {
   content: '';
   display: inline-block;
   width: 2px;
   height: 1em;
-  background: #60a5fa;
+  background: rgba(168, 85, 247, 0.9);
   margin-left: 2px;
   vertical-align: text-bottom;
   animation: pulse 1s infinite;
 }
 
-/* Reduced motion */
+@media (max-width: 767px) {
+  .lightbox-backdrop {
+    @apply px-0 py-0;
+  }
+}
+
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after {
     animation-duration: 0.01ms !important;
     animation-iteration-count: 1 !important;
+    scroll-behavior: auto !important;
     transition-duration: 0.01ms !important;
   }
 }

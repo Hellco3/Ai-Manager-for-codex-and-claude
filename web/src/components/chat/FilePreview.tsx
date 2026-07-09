@@ -1,4 +1,5 @@
-import React, { useState, useCallback } from 'react';
+import React, { useState, useCallback, useEffect, useRef } from 'react';
+import { AnimatePresence, motion, useReducedMotion } from 'framer-motion';
 import type { FileAttachment } from '../../api/upload.js';
 import { getUploadUrl } from '../../api/upload.js';
 
@@ -8,6 +9,7 @@ interface FilePreviewProps {
   fileSize?: number;
   mimeType?: string;
   status?: 'queued' | 'uploading' | 'ready' | 'failed';
+  progress?: number;
   onRemove?: () => void;
   onRetry?: () => void;
 }
@@ -18,13 +20,13 @@ function formatSize(bytes: number): string {
   return `${(bytes / (1024 * 1024)).toFixed(1)}MB`;
 }
 
-function getFileIcon(mimeType: string): string {
-  if (mimeType.startsWith('image/')) return '🖼️';
-  if (mimeType.includes('pdf')) return '📄';
-  if (mimeType.includes('zip')) return '📦';
-  if (mimeType.startsWith('text/')) return '📝';
-  if (mimeType.includes('json')) return '📋';
-  return '📎';
+function getFileIcon(mimeType: string): React.ReactNode {
+  if (mimeType.startsWith('image/')) return 'IMG';
+  if (mimeType.includes('pdf')) return 'PDF';
+  if (mimeType.includes('zip')) return 'ZIP';
+  if (mimeType.startsWith('text/')) return 'TXT';
+  if (mimeType.includes('json')) return 'JSON';
+  return 'FILE';
 }
 
 export default function FilePreview({
@@ -33,173 +35,261 @@ export default function FilePreview({
   fileSize,
   mimeType,
   status = 'ready',
+  progress = 0,
   onRemove,
   onRetry,
 }: FilePreviewProps) {
+  const reduceMotion = useReducedMotion();
   const [lightboxOpen, setLightboxOpen] = useState(false);
+  const closeButtonRef = useRef<HTMLButtonElement>(null);
   const name = attachment?.originalName ?? fileName ?? 'unknown';
   const size = attachment?.size ?? fileSize ?? 0;
   const mime = attachment?.mimeType ?? mimeType ?? 'application/octet-stream';
   const isImage = mime.startsWith('image/');
-  const type = isImage ? 'image' : 'file';
 
-  const handleKeyDown = useCallback(
+  const openLightbox = useCallback(() => {
+    if (isImage && attachment) {
+      setLightboxOpen(true);
+    }
+  }, [attachment, isImage]);
+
+  const handlePreviewKeyDown = useCallback(
     (e: React.KeyboardEvent) => {
-      if (e.key === 'Escape') setLightboxOpen(false);
+      if (e.key === 'Enter' || e.key === ' ') {
+        e.preventDefault();
+        openLightbox();
+      }
     },
-    [],
+    [openLightbox],
   );
 
-  // Queued / uploading state
-  if (status === 'queued' || status === 'uploading') {
-    return (
-      <div className="file-card relative group shrink-0" role="status" aria-label={`Uploading ${name}`}>
-        <div className="flex items-center gap-2">
-          <div className="w-10 h-10 rounded-lg bg-slate-700/50 flex items-center justify-center">
-            <svg className="animate-spin w-5 h-5 text-blue-400" fill="none" viewBox="0 0 24 24">
-              <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-              <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
-            </svg>
-          </div>
-          <div className="min-w-0 flex-1">
-            <p className="text-xs text-slate-300 truncate max-w-[120px]">{name}</p>
-            <p className="text-[10px] text-slate-500">Uploading...</p>
-          </div>
-        </div>
-        {onRemove && (
-          <button
-            onClick={onRemove}
-            className="absolute -top-1.5 -right-1.5 w-5 h-5 rounded-full bg-slate-700 hover:bg-red-600 text-slate-400 hover:text-white flex items-center justify-center transition-all opacity-0 group-hover:opacity-100"
-            aria-label="Remove"
-          >
-            ×
-          </button>
-        )}
-      </div>
-    );
-  }
+  const handleLightboxKeyDown = useCallback((e: React.KeyboardEvent<HTMLDivElement>) => {
+    if (e.key === 'Escape') {
+      e.preventDefault();
+      setLightboxOpen(false);
+      return;
+    }
 
-  // Failed state
-  if (status === 'failed') {
-    return (
-      <div className="file-card relative group shrink-0 border-red-500/30 bg-red-500/5" role="alert" aria-live="assertive">
-        <div className="flex items-center gap-2">
-          <div className="w-10 h-10 rounded-lg bg-red-500/10 flex items-center justify-center text-lg">
-            ⚠️
-          </div>
-          <div className="min-w-0 flex-1">
-            <p className="text-xs text-slate-300 truncate max-w-[120px]">{name}</p>
-            <p className="text-[10px] text-red-400">Upload failed</p>
-          </div>
-        </div>
-        <div className="flex gap-1">
-          {onRetry && (
-            <button
-              onClick={onRetry}
-              className="text-[10px] text-blue-400 hover:text-blue-300 transition-colors"
-            >
-              Retry
-            </button>
-          )}
-          {onRemove && (
-            <button
-              onClick={onRemove}
-              className="text-[10px] text-slate-500 hover:text-slate-300 transition-colors"
-            >
-              Remove
-            </button>
-          )}
-        </div>
-      </div>
-    );
-  }
+    if (e.key === 'Tab') {
+      e.preventDefault();
+      closeButtonRef.current?.focus();
+    }
+  }, []);
 
-  // Ready state - image
-  if (isImage && attachment) {
-    const imgUrl = getUploadUrl(attachment.storageKey);
-    return (
-      <>
-        <div className="file-card relative group shrink-0 cursor-pointer" onClick={() => setLightboxOpen(true)}>
-          <img
-            src={imgUrl}
-            alt={name}
-            className="w-12 h-12 rounded-lg object-cover border border-slate-700/50"
-          />
-          {onRemove && (
-            <button
-              onClick={(e) => {
-                e.stopPropagation();
-                onRemove();
-              }}
-              className="absolute -top-1.5 -right-1.5 w-5 h-5 rounded-full bg-slate-700 hover:bg-red-600 text-slate-400 hover:text-white flex items-center justify-center transition-all opacity-0 group-hover:opacity-100"
-              aria-label="Remove"
-            >
-              ×
-            </button>
-          )}
-        </div>
+  useEffect(() => {
+    if (!lightboxOpen) return;
+    const originalOverflow = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+    closeButtonRef.current?.focus();
+    return () => {
+      document.body.style.overflow = originalOverflow;
+    };
+  }, [lightboxOpen]);
 
-        {/* Lightbox */}
-        {lightboxOpen && (
-          <div
-            className="lightbox-backdrop"
-            onClick={() => setLightboxOpen(false)}
-            onKeyDown={handleKeyDown}
-            tabIndex={0}
-            role="dialog"
-            aria-label={`Viewing ${name}`}
-          >
-            <img
-              src={imgUrl}
-              alt={name}
-              className="max-w-[90vw] max-h-[90vh] rounded-xl object-contain"
-              onClick={(e) => e.stopPropagation()}
-            />
-            <button
-              onClick={() => setLightboxOpen(false)}
-              className="absolute top-4 right-4 w-10 h-10 rounded-full bg-slate-800/80 hover:bg-slate-700 text-white flex items-center justify-center text-xl transition-all"
-              aria-label="Close"
-            >
-              ×
-            </button>
-          </div>
-        )}
-      </>
-    );
-  }
+  const lightboxMotion = reduceMotion
+    ? { initial: false, animate: { opacity: 1 }, exit: { opacity: 0 } }
+    : { initial: { opacity: 0 }, animate: { opacity: 1 }, exit: { opacity: 0 } };
 
-  // Ready state - generic file
+  const cardMotion = reduceMotion
+    ? { initial: false, animate: { opacity: 1 }, exit: { opacity: 1 } }
+    : { initial: { opacity: 0, y: 8 }, animate: { opacity: 1, y: 0 }, exit: { opacity: 0, y: -8 } };
+
+  const uploadProgress = status === 'uploading' ? progress : status === 'queued' ? 15 : 100;
+
   return (
-    <div className="file-card relative group shrink-0">
-      <div className="flex items-center gap-2">
-        <div className="w-10 h-10 rounded-lg bg-slate-700/50 flex items-center justify-center text-lg">
-          {getFileIcon(mime)}
-        </div>
-        <div className="min-w-0 flex-1">
-          <p className="text-xs text-slate-300 truncate max-w-[120px]">{name}</p>
-          <p className="text-[10px] text-slate-500">{formatSize(size)}</p>
-        </div>
-      </div>
-      {attachment && (
-        <a
-          href={getUploadUrl(attachment.storageKey)}
-          target="_blank"
-          rel="noopener noreferrer"
-          className="text-[10px] text-blue-400 hover:text-blue-300 transition-colors"
-          download={name}
-        >
-          Open
-        </a>
-      )}
-      {onRemove && (
-        <button
-          onClick={onRemove}
-          className="absolute -top-1.5 -right-1.5 w-5 h-5 rounded-full bg-slate-700 hover:bg-red-600 text-slate-400 hover:text-white flex items-center justify-center transition-all opacity-0 group-hover:opacity-100"
-          aria-label="Remove"
-        >
-          ×
-        </button>
-      )}
-    </div>
+    <>
+      <AnimatePresence mode="wait" initial={false}>
+        {(status === 'queued' || status === 'uploading') && (
+          <motion.div
+            key={`${name}-uploading`}
+            {...cardMotion}
+            className="file-card group relative min-w-[220px] shrink-0 flex-col items-stretch"
+            role="status"
+            aria-live="polite"
+            aria-label={`Uploading ${name}`}
+          >
+            <div className="flex items-center gap-3">
+              <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl border border-slate-700/60 bg-slate-800/70 text-[11px] font-semibold tracking-[0.12em] text-slate-300">
+                {getFileIcon(mime)}
+              </div>
+              <div className="min-w-0 flex-1">
+                <p className="truncate text-xs font-medium text-slate-200">{name}</p>
+                <p className="text-[11px] text-slate-500">Uploading...</p>
+              </div>
+              {onRemove && (
+                <button
+                  type="button"
+                  onClick={onRemove}
+                  className="rounded-full border border-slate-700/60 bg-slate-900/90 p-1 text-slate-400 transition-colors hover:border-red-500/40 hover:text-red-200"
+                  aria-label="Remove"
+                >
+                  <svg className="h-[14px] w-[14px]" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M6 18L18 6M6 6l12 12" />
+                  </svg>
+                </button>
+              )}
+            </div>
+            <div className="mt-3 h-1.5 overflow-hidden rounded-full bg-slate-800/95">
+              <div
+                className="h-full rounded-full bg-purple-500 transition-[width] duration-300 ease-linear"
+                style={{ width: `${Math.min(Math.max(uploadProgress, 0), 100)}%` }}
+              />
+            </div>
+          </motion.div>
+        )}
+
+        {status === 'failed' && (
+          <motion.div
+            key={`${name}-failed`}
+            {...cardMotion}
+            className="file-card min-w-[220px] shrink-0 flex-col items-stretch border-red-500/25 bg-red-500/6"
+            role="alert"
+            aria-live="assertive"
+          >
+            <div className="flex items-center gap-3">
+              <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl border border-red-500/20 bg-red-500/10 text-[11px] font-semibold tracking-[0.12em] text-red-200">
+                FAIL
+              </div>
+              <div className="min-w-0 flex-1">
+                <p className="truncate text-xs font-medium text-slate-200">{name}</p>
+                <p className="text-[11px] text-red-300">Upload failed</p>
+              </div>
+            </div>
+            <div className="mt-3 flex gap-2 text-[11px]">
+              {onRetry && (
+                <button
+                  type="button"
+                  onClick={onRetry}
+                  className="rounded-full border border-purple-500/25 bg-purple-500/10 px-2.5 py-1 text-purple-200 transition-colors hover:bg-purple-500/18"
+                >
+                  Retry
+                </button>
+              )}
+              {onRemove && (
+                <button
+                  type="button"
+                  onClick={onRemove}
+                  className="rounded-full border border-slate-700/55 bg-slate-900/70 px-2.5 py-1 text-slate-300 transition-colors hover:border-slate-600/70"
+                >
+                  Remove
+                </button>
+              )}
+            </div>
+          </motion.div>
+        )}
+
+        {status === 'ready' && isImage && attachment && (
+          <motion.div key={`${name}-image`} {...cardMotion} className="relative shrink-0">
+            <button
+              type="button"
+              className="file-card group min-w-[150px] cursor-pointer items-center gap-3"
+              onClick={openLightbox}
+              onKeyDown={handlePreviewKeyDown}
+              aria-label={`Preview ${name}`}
+            >
+              <img
+                src={getUploadUrl(attachment.storageKey)}
+                alt={name}
+                className="h-14 w-14 rounded-2xl border border-slate-700/60 object-cover"
+              />
+              <div className="min-w-0 flex-1 text-left">
+                <p className="truncate text-xs font-medium text-slate-200">{name}</p>
+                <p className="text-[11px] text-slate-500">{formatSize(size)}</p>
+              </div>
+            </button>
+            {onRemove && (
+              <button
+                type="button"
+                onClick={onRemove}
+                className="absolute -right-1 -top-1 rounded-full border border-slate-700/60 bg-slate-950/92 p-1 text-slate-400 transition-colors hover:border-red-500/40 hover:text-red-200"
+                aria-label="Remove"
+              >
+                <svg className="h-[14px] w-[14px]" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
+            )}
+          </motion.div>
+        )}
+
+        {status === 'ready' && (!isImage || !attachment) && (
+          <motion.div key={`${name}-file`} {...cardMotion} className="relative shrink-0">
+            <div className="file-card min-w-[220px]">
+              <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl border border-slate-700/60 bg-slate-800/75 text-[11px] font-semibold tracking-[0.12em] text-slate-300">
+                {getFileIcon(mime)}
+              </div>
+              <div className="min-w-0 flex-1">
+                <p className="truncate text-xs font-medium text-slate-200">{name}</p>
+                <p className="text-[11px] text-slate-500">{formatSize(size)}</p>
+              </div>
+              {attachment && (
+                <a
+                  href={getUploadUrl(attachment.storageKey)}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="rounded-full border border-purple-500/25 bg-purple-500/10 px-2.5 py-1 text-[11px] text-purple-200 transition-colors hover:bg-purple-500/18"
+                  download={name}
+                >
+                  Open
+                </a>
+              )}
+            </div>
+            {onRemove && (
+              <button
+                type="button"
+                onClick={onRemove}
+                className="absolute -right-1 -top-1 rounded-full border border-slate-700/60 bg-slate-950/92 p-1 text-slate-400 transition-colors hover:border-red-500/40 hover:text-red-200"
+                aria-label="Remove"
+              >
+                <svg className="h-[14px] w-[14px]" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
+            )}
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      <AnimatePresence>
+        {lightboxOpen && attachment && (
+          <motion.div
+            {...lightboxMotion}
+            className="lightbox-backdrop cursor-default md:cursor-zoom-out"
+            onClick={() => setLightboxOpen(false)}
+            role="dialog"
+            aria-modal="true"
+            aria-label={`Viewing ${name}`}
+            tabIndex={-1}
+            onKeyDown={handleLightboxKeyDown}
+          >
+            <motion.div
+              initial={reduceMotion ? false : { opacity: 0, scale: 0.96 }}
+              animate={reduceMotion ? { opacity: 1 } : { opacity: 1, scale: 1 }}
+              exit={reduceMotion ? { opacity: 0 } : { opacity: 0, scale: 0.98 }}
+              transition={{ duration: reduceMotion ? 0 : 0.18 }}
+              className="relative flex h-full w-full items-center justify-center md:h-auto md:w-auto"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <img
+                src={getUploadUrl(attachment.storageKey)}
+                alt={name}
+                className="h-full w-full object-contain md:max-h-[90vh] md:max-w-[90vw]"
+              />
+              <button
+                ref={closeButtonRef}
+                type="button"
+                onClick={() => setLightboxOpen(false)}
+                className="absolute right-4 top-4 rounded-full border border-slate-700/60 bg-slate-950/88 p-2 text-slate-100 transition-colors hover:border-slate-500/70"
+                aria-label="Close"
+              >
+                <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+    </>
   );
 }

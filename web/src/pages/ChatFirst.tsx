@@ -15,8 +15,6 @@ import TimePanel from '../components/stats/TimePanel.js';
 
 export default function ChatFirst() {
   const navigate = useNavigate();
-
-  // Pipeline store
   const messages = usePipelineStore((s) => s.messages);
   const isStreaming = usePipelineStore((s) => s.isStreaming);
   const streamingContent = usePipelineStore((s) => s.streamingContent);
@@ -24,8 +22,6 @@ export default function ChatFirst() {
   const removeLastUserMessage = usePipelineStore((s) => s.removeLastUserMessage);
   const hydrateFromSession = usePipelineStore((s) => s.hydrateFromSession);
   const reset = usePipelineStore((s) => s.reset);
-  const sessionId = useSessionStore((s) => s.sessionId);
-  const setSession = useSessionStore((s) => s.setSession);
   const stages = usePipelineStore((s) => s.stages);
   const subtasks = usePipelineStore((s) => s.subtasks);
   const currentStage = usePipelineStore((s) => s.currentStage);
@@ -36,24 +32,28 @@ export default function ChatFirst() {
   const totalCost = usePipelineStore((s) => s.totalCost);
   const totalDurationMs = usePipelineStore((s) => s.totalDurationMs);
   const workspaceDir = usePipelineStore((s) => s.workspaceDir);
-
+  const sessionId = useSessionStore((s) => s.sessionId);
+  const setSession = useSessionStore((s) => s.setSession);
   const { close } = useSSE(sessionId, !!sessionId);
 
   const [sendError, setSendError] = useState<string | null>(null);
   const [isSending, setIsSending] = useState(false);
   const [hydrated, setHydrated] = useState(false);
+  const [isPanelOpen, setIsPanelOpen] = useState(true);
+  const [isMobilePanelOpen, setIsMobilePanelOpen] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
 
-  // Hydrate from existing session
   useEffect(() => {
     if (!sessionId || hydrated) return;
     (async () => {
       try {
         const session = await getTask(sessionId);
         hydrateFromSession(session);
-      } catch { /* ignore */ }
-      finally { setHydrated(true); }
+      } catch {
+      } finally {
+        setHydrated(true);
+      }
     })();
   }, [sessionId, hydrated, hydrateFromSession]);
 
@@ -66,20 +66,20 @@ export default function ChatFirst() {
     }
   }, []);
 
-  useEffect(() => { scrollToBottom(); }, [messages, streamingContent, scrollToBottom]);
+  useEffect(() => {
+    scrollToBottom();
+  }, [messages, streamingContent, scrollToBottom]);
 
   const handleSend = async (message: string, attachmentIds: string[]) => {
     setSendError(null);
     setIsSending(true);
     scrollToBottom(true);
 
-    // If no session yet, create one in chat-first mode
     if (!sessionId) {
       try {
         const result = await postTask(message, 'chat-first', workspaceDir ?? undefined);
         setSession(result.sessionId, message, 'chat-first');
         addUserMessage(message, attachmentIds.length > 0 ? attachmentIds : undefined);
-        // Start SSE connection by navigating (triggers useSSE)
       } catch (err: any) {
         setSendError(err.message || t.chat.error);
       } finally {
@@ -88,7 +88,6 @@ export default function ChatFirst() {
       return;
     }
 
-    // Existing session — send message
     addUserMessage(message, attachmentIds.length > 0 ? attachmentIds : undefined);
     try {
       await sendMessage(sessionId, message, attachmentIds.length > 0 ? attachmentIds : undefined);
@@ -105,6 +104,7 @@ export default function ChatFirst() {
     setSendError(null);
     try {
       await confirmTask(sessionId, undefined, workspaceDir ?? undefined);
+      setIsMobilePanelOpen(false);
     } catch (err: any) {
       setSendError(err.message || t.chat.error);
     }
@@ -114,7 +114,8 @@ export default function ChatFirst() {
     if (sessionId) {
       try {
         await updateWorkspace(sessionId, dir);
-      } catch { /* ignore — workspace is saved client-side */ }
+      } catch {
+      }
     }
     usePipelineStore.setState({ workspaceDir: dir });
   };
@@ -123,140 +124,211 @@ export default function ChatFirst() {
     close();
     reset();
     useSessionStore.getState().reset();
+    setSendError(null);
+    setIsMobilePanelOpen(false);
   };
 
-  const hasPipelineStarted = currentStage && currentStage !== 'decompose' && Object.keys(subtasks).length > 0;
-  const showConfirm = sessionId && !hasPipelineStarted && !isComplete;
-
+  const hasPipelineStarted = !!currentStage && currentStage !== 'decompose' && Object.keys(subtasks).length > 0;
+  const showConfirm = !!sessionId && !hasPipelineStarted && !isComplete;
   const stageLabels = t.stages;
-  const stageIcons: Record<string, string> = { decompose: '🔍', review: '👁️', execute: '⚡', aggregate: '📋' };
+  const stageIcons: Record<string, string> = { decompose: 'D', review: 'R', execute: 'E', aggregate: 'A' };
+
+  const renderExecutionPanel = () => (
+    <div className="panel-surface flex h-full flex-col">
+      <div className="flex items-center justify-between border-b border-slate-700/60 px-4 py-4">
+        <div>
+          <div className="panel-badge">Execution</div>
+          <p className="mt-2 text-sm font-medium text-slate-100">{t.progress.title}</p>
+        </div>
+        <button
+          type="button"
+          onClick={() => setIsMobilePanelOpen(false)}
+          className="rounded-full border border-slate-700/60 bg-slate-900/70 p-2 text-slate-400 md:hidden"
+          aria-label="Close execution panel"
+        >
+          <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M6 18L18 6M6 6l12 12" />
+          </svg>
+        </button>
+      </div>
+
+      <div className="chat-scroll flex-1 space-y-4 overflow-y-auto px-4 py-4">
+        {showConfirm && (
+          <div className="rounded-2xl border border-purple-500/18 bg-purple-500/8 p-4">
+            <p className="text-sm font-medium text-slate-100">{t.chatFirst.startTask}</p>
+            <p className="mt-1 text-xs leading-5 text-slate-400">{t.chatFirst.startTaskHint}</p>
+            <button
+              onClick={handleConfirmTask}
+              disabled={isSending || isStreaming}
+              className="mt-4 inline-flex items-center rounded-2xl bg-purple-500 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-purple-400 disabled:opacity-40"
+            >
+              {t.chatFirst.startTask}
+            </button>
+          </div>
+        )}
+
+        {hasPipelineStarted ? (
+          <>
+            <div className="rounded-2xl border border-slate-700/55 bg-slate-900/55 p-4">
+              <PipelineView
+                stages={stages}
+                currentStage={currentStage}
+                stageLabels={stageLabels}
+                stageIcons={stageIcons}
+                subtasks={subtasks}
+              />
+            </div>
+            <div className="grid gap-3">
+              <CostPanel costStats={costStats} totalCost={totalCost} totalDurationMs={totalDurationMs} />
+              <TimePanel totalDurationMs={totalDurationMs} />
+            </div>
+            {Object.keys(subtasks).length > 0 && (
+              <div className="rounded-2xl border border-slate-700/55 bg-slate-900/55 p-4">
+                <SubtaskList subtasks={subtasks} />
+              </div>
+            )}
+          </>
+        ) : (
+          <div className="rounded-2xl border border-slate-700/55 bg-slate-900/45 p-4 text-sm text-slate-400">
+            {sessionId ? t.chatFirst.startTaskHint : t.chatFirst.greeting}
+          </div>
+        )}
+
+        {isError && (
+          <div className="rounded-2xl border border-red-500/20 bg-red-500/8 px-4 py-3 text-xs text-red-300" role="alert" aria-live="assertive">
+            {t.error.failed}: {errorMessage}
+          </div>
+        )}
+      </div>
+    </div>
+  );
 
   return (
-    <div className="max-w-4xl mx-auto">
-      {/* Header */}
-      <div className="flex items-center justify-between mb-4 flex-wrap gap-3">
-        <div className="text-xs text-slate-500">
-          {t.chatFirst.taskLabel}
+    <div className="mx-auto max-w-3xl px-3 pb-4 pt-4 md:px-5 md:pb-6">
+      <div className="mb-4 flex items-center justify-between gap-3">
+        <div>
+          <div className="text-[11px] uppercase tracking-[0.18em] text-slate-500">{t.chatFirst.taskLabel}</div>
+          <div className="mt-1 text-sm text-slate-300">{workspaceDir ?? t.workspace.default}</div>
         </div>
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-2">
+          <button
+            type="button"
+            onClick={() => setIsPanelOpen((open) => !open)}
+            className="hidden rounded-2xl border border-slate-700/60 bg-slate-900/70 px-3 py-2 text-xs text-slate-300 transition-colors hover:border-slate-600/70 hover:text-slate-100 md:inline-flex"
+          >
+            {isPanelOpen ? 'Hide Panel' : 'Show Panel'}
+          </button>
+          <button
+            type="button"
+            onClick={() => setIsMobilePanelOpen(true)}
+            className="inline-flex rounded-2xl border border-slate-700/60 bg-slate-900/70 px-3 py-2 text-xs text-slate-300 transition-colors hover:border-slate-600/70 hover:text-slate-100 md:hidden"
+          >
+            Execution
+          </button>
           {sessionId && (
-            <button onClick={handleNewSession} className="text-xs text-slate-500 hover:text-slate-300 px-2 py-1 rounded bg-slate-800/50">
+            <button
+              onClick={handleNewSession}
+              className="rounded-2xl border border-slate-700/60 bg-slate-900/70 px-3 py-2 text-xs text-slate-300 transition-colors hover:border-slate-600/70 hover:text-slate-100"
+            >
               + {t.progress.newTask}
             </button>
           )}
-          <button onClick={() => navigate('/submit')} className="text-xs text-slate-600 hover:text-slate-400">
+          <button onClick={() => navigate('/submit')} className="text-xs text-slate-500 transition-colors hover:text-slate-300">
             {t.form.execute}
           </button>
         </div>
       </div>
 
-      {/* Chat Panel */}
-      <div className="stage-card p-0 overflow-hidden flex flex-col" style={{ height: 'calc(100vh - 140px)', minHeight: '500px' }}>
-        {/* Workspace selector */}
-        <WorkspaceSelector
-          workspaceDir={workspaceDir}
-          onUpdate={handleUpdateWorkspace}
-          disabled={isSending || !!hasPipelineStarted}
-        />
+      <div className={`grid gap-4 ${isPanelOpen ? 'md:grid-cols-[minmax(0,1fr)_320px]' : 'grid-cols-1'}`}>
+        <div className="chat-shell stage-card flex min-h-[calc(100dvh-8rem)] flex-col overflow-hidden p-0" style={{ minHeight: '560px' }}>
+          <WorkspaceSelector
+            workspaceDir={workspaceDir}
+            onUpdate={handleUpdateWorkspace}
+            disabled={isSending || hasPipelineStarted}
+          />
 
-        {/* Messages area */}
-        <div ref={containerRef} className="flex-1 overflow-y-auto py-3 scroll-smooth">
-          {/* Greeting */}
-          {messages.length === 0 && !isStreaming && (
-            <div className="flex justify-center px-4 py-8">
-              <div className="max-w-md text-center">
-                <div className="text-4xl mb-4">🤖</div>
-                <p className="text-sm text-slate-400 leading-relaxed">{t.chatFirst.greeting}</p>
-              </div>
-            </div>
-          )}
-
-          {messages.map((msg, idx) => (
-            <ChatMessage
-              key={`${msg.timestamp}-${idx}`}
-              role={msg.role}
-              content={msg.content}
-              timestamp={msg.timestamp}
-              attachmentIds={msg.attachmentIds}
-            />
-          ))}
-
-          {/* Streaming message */}
-          {isStreaming && streamingContent && (
-            <ChatMessage role="assistant" content={streamingContent} timestamp={Date.now()} isStreaming />
-          )}
-
-          {/* Typing indicator */}
-          {isStreaming && !streamingContent && (
-            <div className="flex gap-2 px-3 py-2 justify-start">
-              <div className="w-7 h-7 rounded-lg bg-gradient-to-br from-purple-500 to-blue-600 flex items-center justify-center shrink-0">
-                <svg className="w-4 h-4 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
-                </svg>
-              </div>
-              <div className="bg-slate-800/80 border border-slate-700/50 rounded-2xl rounded-bl-md px-4 py-3">
-                <div className="flex gap-1.5">
-                  <span className="w-2 h-2 rounded-full bg-slate-500 animate-bounce" style={{ animationDelay: '0ms' }} />
-                  <span className="w-2 h-2 rounded-full bg-slate-500 animate-bounce" style={{ animationDelay: '150ms' }} />
-                  <span className="w-2 h-2 rounded-full bg-slate-500 animate-bounce" style={{ animationDelay: '300ms' }} />
+          <div ref={containerRef} className="chat-scroll flex-1 overflow-y-auto py-4">
+            {messages.length === 0 && !isStreaming && (
+              <div className="flex justify-center px-5 py-10">
+                <div className="max-w-md text-center">
+                  <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-3xl border border-purple-500/15 bg-slate-900/90 shadow-lg shadow-purple-500/10">
+                    <svg className="h-7 w-7 text-purple-200" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M9 3v2m6-2v2m-7 9h8m-9 5h10a2 2 0 002-2V9a2 2 0 00-2-2H7a2 2 0 00-2 2v7a2 2 0 002 2z" />
+                    </svg>
+                  </div>
+                  <p className="text-sm leading-7 text-slate-400">{t.chatFirst.greeting}</p>
                 </div>
               </div>
-            </div>
-          )}
+            )}
 
-          {/* Pipeline inline view */}
-          {hasPipelineStarted && (
-            <div className="px-4 py-3 mx-3 my-2 rounded-xl bg-slate-800/30 border border-slate-700/30">
-              <p className="text-xs text-slate-400 mb-2 font-medium">{t.progress.title}</p>
-              <PipelineView stages={stages} currentStage={currentStage} stageLabels={stageLabels} stageIcons={stageIcons} subtasks={subtasks} />
-              <div className="mt-3 grid grid-cols-2 gap-3">
-                <CostPanel costStats={costStats} totalCost={totalCost} totalDurationMs={totalDurationMs} />
-                <TimePanel totalDurationMs={totalDurationMs} />
-              </div>
-              {Object.keys(subtasks).length > 0 && (
-                <div className="mt-3">
-                  <SubtaskList subtasks={subtasks} />
+            {messages.map((msg, idx) => (
+              <ChatMessage
+                key={`${msg.timestamp}-${idx}`}
+                role={msg.role}
+                content={msg.content}
+                timestamp={msg.timestamp}
+                attachmentIds={msg.attachmentIds}
+              />
+            ))}
+
+            {isStreaming && streamingContent && (
+              <ChatMessage role="assistant" content={streamingContent} timestamp={Date.now()} isStreaming />
+            )}
+
+            {isStreaming && !streamingContent && (
+              <div className="flex items-start gap-3 px-4 py-2 md:px-5">
+                <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-2xl border border-purple-500/15 bg-slate-900/80 shadow-lg shadow-purple-500/20">
+                  <svg className="h-[18px] w-[18px] text-purple-200" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M9 3v2m6-2v2m-8 8h10m-9 5h8a2 2 0 002-2V9a2 2 0 00-2-2H8a2 2 0 00-2 2v7a2 2 0 002 2zm-3-5h2m10 0h2" />
+                  </svg>
                 </div>
-              )}
-            </div>
-          )}
+                <div className="rounded-3xl rounded-bl-lg border border-slate-700/50 border-l-2 border-l-purple-500/30 bg-slate-800/90 px-4 py-3 text-sm text-slate-300">
+                  {t.chat.streaming}
+                </div>
+              </div>
+            )}
 
-          {/* Error */}
-          {isError && (
-            <div className="px-4 py-2 mx-3 my-2 rounded-lg bg-red-500/10 border border-red-500/20 text-red-400 text-xs">
-              {t.error.failed}: {errorMessage}
-            </div>
-          )}
+            {sendError && (
+              <div className="px-4 pb-3 md:px-5">
+                <div className="flex items-center justify-between rounded-2xl border border-red-500/20 bg-red-500/8 px-4 py-3 text-xs text-red-300" role="alert" aria-live="assertive">
+                  <span>{sendError}</span>
+                  <button onClick={() => setSendError(null)} className="rounded-full p-1 text-red-200 transition-colors hover:bg-red-500/10" aria-label="Dismiss error">
+                    <svg className="h-[14px] w-[14px]" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M6 18L18 6M6 6l12 12" />
+                    </svg>
+                  </button>
+                </div>
+              </div>
+            )}
 
-          <div ref={messagesEndRef} />
+            <div ref={messagesEndRef} />
+          </div>
+
+          <ChatInput onSend={handleSend} isDisabled={isStreaming || isSending} sessionId={sessionId} />
         </div>
 
-        {/* Error display */}
-        {sendError && (
-          <div className="px-4 py-2 mx-3 mb-1 rounded-lg bg-red-500/10 border border-red-500/20 text-red-400 text-xs">
-            {sendError}
-            <button onClick={() => setSendError(null)} className="ml-2 text-red-300 hover:text-red-200">✕</button>
-          </div>
+        {isPanelOpen && (
+          <aside className="hidden overflow-hidden rounded-[24px] border border-slate-700/60 shadow-[0_22px_50px_rgba(2,6,23,0.24)] md:block">
+            {renderExecutionPanel()}
+          </aside>
         )}
+      </div>
 
-        {/* Confirm task button */}
-        {showConfirm && (
-          <div className="px-4 py-2 border-t border-slate-700/50 bg-slate-800/30">
-            <div className="flex items-center justify-between">
-              <span className="text-xs text-slate-400">{t.chatFirst.startTaskHint}</span>
-              <button
-                onClick={handleConfirmTask}
-                disabled={isSending || isStreaming}
-                className="px-4 py-2 rounded-lg bg-gradient-to-r from-blue-600 to-purple-600 text-white text-sm font-medium hover:from-blue-500 hover:to-purple-500 transition-all disabled:opacity-40"
-              >
-                {t.chatFirst.startTask}
-              </button>
-            </div>
-          </div>
-        )}
-
-        {/* Input */}
-        <ChatInput onSend={handleSend} isDisabled={isStreaming || isSending} sessionId={sessionId} />
+      <div
+        className={`fixed inset-0 z-40 bg-slate-950/60 transition-opacity duration-200 md:hidden ${
+          isMobilePanelOpen ? 'pointer-events-auto opacity-100' : 'pointer-events-none opacity-0'
+        }`}
+        onClick={() => setIsMobilePanelOpen(false)}
+        aria-hidden={!isMobilePanelOpen}
+      />
+      <div
+        className={`panel-surface fixed inset-x-0 bottom-0 z-50 max-h-[78vh] rounded-t-[28px] border border-slate-700/60 shadow-[0_-18px_60px_rgba(2,6,23,0.45)] transition-transform duration-200 md:hidden ${
+          isMobilePanelOpen ? 'translate-y-0' : 'translate-y-full'
+        }`}
+        aria-hidden={!isMobilePanelOpen}
+      >
+        <div className="mx-auto mt-3 h-1.5 w-12 rounded-full bg-slate-700/80" />
+        {renderExecutionPanel()}
       </div>
     </div>
   );

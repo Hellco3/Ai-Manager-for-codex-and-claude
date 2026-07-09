@@ -1,4 +1,5 @@
 import React from 'react';
+import { motion, useReducedMotion } from 'framer-motion';
 import { t } from '../../i18n.js';
 import FilePreview from './FilePreview.jsx';
 import type { FileAttachment } from '../../api/upload.js';
@@ -20,6 +21,7 @@ function formatTime(ts: number): string {
 }
 
 export default function ChatMessage({ role, content, timestamp, isStreaming, attachmentIds }: ChatMessageProps) {
+  const reduceMotion = useReducedMotion();
   const isUser = role === 'user';
   const isSystem = role === 'system';
   const isAssistant = role === 'assistant';
@@ -31,65 +33,64 @@ export default function ChatMessage({ role, content, timestamp, isStreaming, att
         .filter((a): a is FileAttachment => a != null)
     : [];
 
+  const initial = reduceMotion ? false : { opacity: 0, y: 12 };
+  const animate = { opacity: 1, y: 0 };
+
   if (isSystem) {
     return (
-      <div className="flex justify-center py-2">
-        <div className="px-3 py-1 rounded-full bg-slate-800/50 border border-slate-700/30 text-xs text-slate-500 italic max-w-[80%] text-center">
+      <motion.div initial={initial} animate={animate} className="flex justify-center px-4 py-2">
+        <div className="max-w-[80%] rounded-full border border-slate-700/50 bg-slate-900/65 px-3 py-1 text-center text-xs italic text-slate-500">
           {content}
         </div>
-      </div>
+      </motion.div>
     );
   }
 
   return (
-    <div className={`flex gap-2 px-3 py-2 ${isUser ? 'justify-end' : 'justify-start'}`}>
-      {/* Avatar (assistant side) */}
+    <motion.div
+      initial={initial}
+      animate={animate}
+      className={`flex gap-3 px-3 py-2 md:px-5 ${isUser ? 'justify-end' : 'justify-start'}`}
+    >
       {isAssistant && (
-        <div className="w-7 h-7 rounded-lg bg-gradient-to-br from-purple-500 to-blue-600 flex items-center justify-center shrink-0 mt-0.5 shadow-lg shadow-purple-500/20">
-          <svg className="w-4 h-4 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
+        <div className="mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-2xl border border-purple-500/15 bg-slate-900/80 shadow-lg shadow-purple-500/20">
+          <svg className="h-[18px] w-[18px] text-purple-200" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M9 3v2m6-2v2m-8 8h10m-9 5h8a2 2 0 002-2V9a2 2 0 00-2-2H8a2 2 0 00-2 2v7a2 2 0 002 2zm-3-5h2m10 0h2" />
           </svg>
         </div>
       )}
 
-      <div className={`max-w-[85%] ${isUser ? 'order-first' : ''}`}>
+      <div className={`max-w-[88%] space-y-1.5 md:max-w-[80%] ${isUser ? 'order-first items-end' : ''}`}>
         <div
-          className={`rounded-2xl px-3.5 py-2.5 text-sm leading-relaxed ${
+          className={`rounded-3xl px-4 py-3 text-sm leading-6 ${
             isUser
-              ? 'bg-blue-600/20 border border-blue-400/20 text-blue-50 rounded-br-md'
-              : 'bg-slate-800/80 border border-slate-700/50 text-slate-200 rounded-bl-md border-l-2 border-l-purple-500/30'
+              ? 'rounded-br-lg border border-blue-400/15 bg-blue-700/40 text-blue-50'
+              : 'rounded-bl-lg border border-slate-700/50 border-l-2 border-l-purple-500/30 bg-slate-800/90 text-slate-100'
           } ${isStreaming ? 'streaming-cursor' : ''}`}
         >
-          <div className="whitespace-pre-wrap break-words">
-            {content}
-            {isStreaming && (
-              <span className="inline-block w-0.5 h-4 bg-blue-400 ml-0.5 animate-pulse align-text-bottom" />
-            )}
-          </div>
+          <div className="whitespace-pre-wrap break-words">{content}</div>
         </div>
 
-        {/* File attachments */}
         {attachments.length > 0 && (
-          <div className="flex flex-wrap gap-1.5 mt-1.5">
+          <div className="flex flex-wrap gap-2 overflow-x-auto pb-1 md:overflow-visible">
             {attachments.map((att) => (
               <FilePreview key={att.id} attachment={att} status="ready" />
             ))}
           </div>
         )}
 
-        <div className={`text-[10px] text-slate-600 mt-1 ${isUser ? 'text-right' : 'text-left'}`}>
-          {isUser ? t.chat.user : t.chat.assistant} · {formatTime(timestamp)}
+        <div className={`text-[10px] text-slate-500 ${isUser ? 'text-right' : 'text-left'}`}>
+          {isUser ? t.chat.user : t.chat.assistant} | {formatTime(timestamp)}
         </div>
       </div>
 
-      {/* Avatar (user side) */}
       {isUser && (
-        <div className="w-7 h-7 rounded-lg bg-slate-700 border border-slate-600 flex items-center justify-center shrink-0 mt-0.5">
-          <svg className="w-4 h-4 text-slate-300" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+        <div className="mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-2xl border border-slate-700/60 bg-slate-900/85">
+          <svg className="h-[18px] w-[18px] text-slate-300" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M15 8a3 3 0 11-6 0 3 3 0 016 0zm-9 9a6 6 0 1112 0H6z" />
           </svg>
         </div>
       )}
-    </div>
+    </motion.div>
   );
 }
