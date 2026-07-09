@@ -111,11 +111,12 @@ export async function confirmTask(
   sessionId: string,
   task?: string,
   workspaceDir?: string,
+  message?: string,
 ): Promise<void> {
   const res = await fetch(`${BASE_URL}/sessions/${sessionId}/confirm`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ task, workspaceDir }),
+    body: JSON.stringify({ task, workspaceDir, message }),
   });
   if (!res.ok) throw await parseError(res);
 }

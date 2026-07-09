@@ -274,7 +274,18 @@ router.post('/sessions/:id/confirm', async (req: Request, res: Response) => {
     return;
   }
 
-  const { task: refinedTask, workspaceDir } = req.body;
+  const { task: refinedTask, workspaceDir, message: confirmMessage } = req.body;
+
+  // Save the user's confirmation message so it survives refresh
+  if (confirmMessage && typeof confirmMessage === 'string' && confirmMessage.trim()) {
+    sessionStore.addMessage(id, 'user', confirmMessage.trim());
+    sseManager.broadcast(id, {
+      type: 'message:complete',
+      content: confirmMessage.trim(),
+      role: 'user',
+      timestamp: Date.now(),
+    });
+  }
 
   // Atomically claim
   const claimed = sessionStore.tryTransitionStatus(id, [session.status], 'decomposing');

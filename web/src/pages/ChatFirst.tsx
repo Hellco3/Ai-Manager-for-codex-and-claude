@@ -128,7 +128,7 @@ export default function ChatFirst() {
     if (sessionId && confirmPattern.test(message.trim()) && !hasPipelineStarted) {
       addUserMessage(message, attachmentIds.length > 0 ? attachmentIds : undefined);
       try {
-        await confirmTask(sessionId, undefined, workspaceDir ?? undefined);
+        await confirmTask(sessionId, undefined, workspaceDir ?? undefined, message.trim());
         window.setTimeout(async () => {
           try {
             const session = await getTask(sessionId);
@@ -194,7 +194,7 @@ export default function ChatFirst() {
     if (!sessionId) return;
     setSendError(null);
     try {
-      await confirmTask(sessionId, undefined, workspaceDir ?? undefined);
+      await confirmTask(sessionId, undefined, workspaceDir ?? undefined, '开始执行');
       window.setTimeout(async () => {
         try {
           const session = await getTask(sessionId);
@@ -435,13 +435,15 @@ export default function ChatFirst() {
         </div>
       </div>
 
-      {/* Grid: right panel is initially narrow (344px), expands to 420px when decomposition + pipeline data become available */}
+      {/* Grid: right panel width adapts — 344px idle, 420px decomposition, 520px execution */}
       <div
         className={`grid gap-4 transition-[grid-template-columns] duration-500 ease-out ${
           isPanelOpen
-            ? showDecomposition && decomposition
-              ? 'md:grid-cols-[minmax(0,1fr)_420px]'
-              : 'md:grid-cols-[minmax(0,1fr)_344px]'
+            ? hasPipelineStarted
+              ? 'md:grid-cols-[minmax(0,1fr)_520px]'
+              : showDecomposition && decomposition
+                ? 'md:grid-cols-[minmax(0,1fr)_420px]'
+                : 'md:grid-cols-[minmax(0,1fr)_344px]'
             : 'md:grid-cols-[minmax(0,1fr)_48px]'
         }`}
         style={{ height: 'calc(100dvh - 140px)' }}

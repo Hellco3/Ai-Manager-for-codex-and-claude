@@ -518,7 +518,7 @@ export const usePipelineStore = create<PipelineStore>((set, get) => ({
           // Deduplicate: skip if the last message already matches this one
           const lastMsg = s.messages[s.messages.length - 1];
           if (lastMsg && lastMsg.role === msgEvent.role && lastMsg.content === msgEvent.content) {
-            return s;
+            return { isStreaming: false, streamingContent: '' };
           }
           return {
             isStreaming: false,
