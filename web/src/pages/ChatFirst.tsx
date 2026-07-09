@@ -75,6 +75,32 @@ export default function ChatFirst() {
     scrollToBottom();
   }, [messages, streamingContent, scrollToBottom]);
 
+  // Elapsed time counter: ticks every second while processing
+  const elapsedRef = useRef(0);
+  const [elapsedDisplay, setElapsedDisplay] = useState<string>('');
+  const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+
+  useEffect(() => {
+    if (statusStartedAt) {
+      elapsedRef.current = 0;
+      const tick = () => {
+        elapsedRef.current++;
+        const s = elapsedRef.current;
+        if (s < 60) {
+          setElapsedDisplay(`${s}s`);
+        } else {
+          setElapsedDisplay(`${Math.floor(s / 60)}m ${s % 60}s`);
+        }
+      };
+      tick();
+      timerRef.current = setInterval(tick, 1000);
+      return () => { if (timerRef.current) clearInterval(timerRef.current); };
+    } else {
+      setElapsedDisplay('');
+      if (timerRef.current) { clearInterval(timerRef.current); timerRef.current = null; }
+    }
+  }, [statusStartedAt]);
+
   const handleSend = async (message: string, attachmentIds: string[]) => {
     setSendError(null);
     setIsSending(true);
@@ -258,6 +284,9 @@ export default function ChatFirst() {
               <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
             </svg>
             <span>{statusMessage}</span>
+            {elapsedDisplay && (
+              <span className="text-[11px] text-purple-400/60 ml-0.5 tabular-nums">{elapsedDisplay}</span>
+            )}
           </div>
           <span className="inline-flex gap-0.5">
             <span className="w-1 h-1 rounded-full bg-purple-400/60 animate-bounce" style={{ animationDelay: '0ms' }} />
