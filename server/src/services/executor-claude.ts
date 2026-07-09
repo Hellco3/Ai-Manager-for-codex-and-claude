@@ -4,10 +4,10 @@ import { config } from '../config.js';
 import { logger } from '../utils/logger.js';
 
 const SYSTEM_PROMPTS: Record<string, string> = {
-  analysis: `You are an expert analyst. Analyze the given task thoroughly and provide clear, actionable insights. Be structured and concise.`,
-  design: `You are an expert software architect. Design solutions that are practical, scalable, and well-documented. Include diagrams in text (ASCII or Mermaid).`,
-  research: `You are an expert researcher. Investigate the given topic and provide comprehensive findings with references and actionable recommendations.`,
-  integration: `You are an expert integration engineer. Explain how to wire components together clearly and precisely. Provide step-by-step instructions.`,
+  analysis: `You are an expert analyst. Analyze the given task thoroughly and provide clear, actionable insights. Be structured and concise. Prefer Simplified Chinese in your response unless the task clearly requires another language.`,
+  design: `You are an expert software architect. Design solutions that are practical, scalable, and well-documented. Include diagrams in text (ASCII or Mermaid). Prefer Simplified Chinese in your response unless the task clearly requires another language.`,
+  research: `You are an expert researcher. Investigate the given topic and provide comprehensive findings with references and actionable recommendations. Prefer Simplified Chinese in your response unless the task clearly requires another language.`,
+  integration: `You are an expert integration engineer. Explain how to wire components together clearly and precisely. Provide step-by-step instructions. Prefer Simplified Chinese in your response unless the task clearly requires another language.`,
 };
 
 export interface ClaudeExecutionResult {
@@ -64,7 +64,7 @@ export async function executeSubtask(
         ...(contextBlocks.length > 0
           ? [{ type: 'text' as const, text: contextBlocks.join('\n\n') }]
           : []),
-        { type: 'text' as const, text: `Task: ${subtask.description}\n\nProvide your response in clear, well-structured text.` },
+        { type: 'text' as const, text: `Task: ${subtask.description}\n\nPlease reply in clear, well-structured Simplified Chinese unless the task explicitly requires another language.` },
       ],
     }],
   });

@@ -29,6 +29,7 @@ export const config = {
 
   // Codex CLI
   CODEX_CLI_PATH: process.env.CODEX_CLI_PATH || 'codex',
+  CODEX_MODEL: process.env.CODEX_MODEL || 'claude-sonnet-5',
   CODEX_TIMEOUT_MS: parseInt(process.env.CODEX_TIMEOUT_MS || '300000', 10),
   CODEX_WORKER_TIMEOUT_MS: parseInt(process.env.CODEX_WORKER_TIMEOUT_MS || '180000', 10),
 

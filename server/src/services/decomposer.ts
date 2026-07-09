@@ -71,6 +71,10 @@ const SYSTEM_PROMPT = `You are an expert task decomposition engine. Given a user
 - If a subtask is too broad, SPLIT it further
 - If a subtask is trivial, MERGE it with related work
 
+## Output Language:
+- Prefer Simplified Chinese for every JSON string field
+- Keep the overview, subtask descriptions, and execution notes in Chinese whenever possible
+
 You MUST respond with ONLY valid JSON matching the specified schema. No other text.
 
 CRITICAL: Your JSON response MUST include ALL of these top-level fields:

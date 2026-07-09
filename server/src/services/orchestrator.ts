@@ -212,7 +212,7 @@ class Orchestrator {
 
               if (actualExecutor === 'codex') {
                 try {
-                  result = await executeCodexSubtask(st, signal, (chunk: string) => {
+                  const codexResult = await executeCodexSubtask(st, signal, (chunk: string) => {
                     sessionStore.appendSubtaskProgress(sessionId, st.id, chunk);
                     sseManager.broadcast(sessionId, {
                       type: 'subtask:progress',
@@ -220,6 +220,9 @@ class Orchestrator {
                       chunk,
                     });
                   });
+                  result = codexResult.text;
+                  inputTokens = codexResult.inputTokens;
+                  outputTokens = codexResult.outputTokens;
                 } catch (codexErr) {
                   // ANY Codex error → fall back to Claude API
                   // (Codex may be unavailable due to network, auth, or missing executable)
@@ -453,9 +456,9 @@ class Orchestrator {
       let contextTask = session.task;
       if (session.messages && session.messages.length > 0) {
         const history = session.messages.map(m => `${m.role}: ${m.content}`).join('\n');
-        contextTask = `Original task: ${session.task}\n\nConversation history:\n${history}\n\nLatest request: ${message}`;
+        contextTask = `原始任务：${session.task}\n\n对话历史：\n${history}\n\n最新请求：${message}\n\n请尽量使用简体中文进行重新拆解。`;
       } else {
-        contextTask = `Original task: ${session.task}\n\nFollow-up request: ${message}`;
+        contextTask = `原始任务：${session.task}\n\n追加请求：${message}\n\n请尽量使用简体中文进行重新拆解。`;
       }
 
       const { decomposition, inputTokens, outputTokens } = await decomposeTask(contextTask);
@@ -467,7 +470,7 @@ class Orchestrator {
 
       // Notify chat about new plan
       const planSummary = decomposition.overview +
-        `\n\nI've created ${decomposition.subtasks.length} subtasks to handle this. Estimated time: ${decomposition.estimatedTimeMinutes ?? 'unknown'} min.`;
+        `\n\n我已经为这次请求拆出了 ${decomposition.subtasks.length} 个子任务，预计耗时 ${decomposition.estimatedTimeMinutes ?? '未知'} 分钟。`;
       sseManager.broadcast(sessionId, {
         type: 'message:complete',
         content: planSummary,
@@ -522,11 +525,11 @@ class Orchestrator {
       const stream = anthropic.messages.stream({
         model: config.EXECUTOR_MODEL,
         max_tokens: 4000,
-        system: `You are a helpful AI assistant in a task orchestration system. The user has submitted a task: "${session.task}".
+        system: `你是任务编排系统中的 AI 助手。用户提交的任务是：“${session.task}”。
 
-You are having a conversation about this task. Be concise, helpful, and collaborative. Acknowledge the user's request and explain what you'll do next. After your response, the system will re-decompose and execute subtasks automatically.
+你正在围绕这个任务与用户继续对话。请简洁、友好、协作地回应，先确认用户诉求，再说明你接下来会怎么处理。你的回复后，系统会自动重新拆解并执行子任务。
 
-CRITICAL: Keep responses brief (2-4 sentences). The system handles execution — you just need to communicate clearly with the user.`,
+重要：回复尽量简短，控制在 2 到 4 句话内。默认优先使用简体中文；只有当任务明确要求其他语言时才切换。系统会负责实际执行，你只需要把话说明白。`,
         messages: [
           ...historyMessages,
           { role: 'user' as const, content: userMessage },
@@ -563,8 +566,8 @@ CRITICAL: Keep responses brief (2-4 sentences). The system handles execution —
       logger.error({ sessionId, error }, 'Chat response streaming failed');
       // Non-fatal: broadcast the real error to chat and continue with re-decomposition
       const errorMessage = error?.status === 401
-        ? 'Authentication error with AI service. Please check configuration.'
-        : `Chat response unavailable (${error.message || 'unknown error'}). Proceeding with task re-decomposition.`;
+        ? 'AI 服务认证失败，请检查相关配置。'
+        : `聊天回复暂时不可用（${error.message || '未知错误'}），系统将继续进行任务重新拆解。`;
       sseManager.broadcast(sessionId, {
         type: 'message:complete',
         content: errorMessage,
@@ -600,12 +603,12 @@ CRITICAL: Keep responses brief (2-4 sentences). The system handles execution —
 
       let contextTask = session.task;
       if (session.messages && session.messages.length > 0) {
-        contextTask += '\n\nConversation:\n' + session.messages.map(m => `${m.role}: ${m.content}`).join('\n');
+        contextTask += '\n\n对话记录：\n' + session.messages.map(m => `${m.role}: ${m.content}`).join('\n');
       }
       if (completedResults.length > 0) {
-        contextTask += '\n\nCompleted work:\n' + completedResults.join('\n');
+        contextTask += '\n\n已完成工作：\n' + completedResults.join('\n');
       }
-      contextTask += '\n\nReconstruct and continue remaining work.';
+      contextTask += '\n\n请基于以上上下文重新拆解并继续剩余工作，尽量使用简体中文输出。';
 
       const { decomposeTask } = await import('./decomposer.js');
       const { decomposition, inputTokens, outputTokens } = await decomposeTask(contextTask);

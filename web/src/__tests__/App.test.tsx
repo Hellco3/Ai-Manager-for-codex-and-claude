@@ -3,6 +3,7 @@ import { render, screen } from '@testing-library/react';
 import React from 'react';
 import { BrowserRouter } from 'react-router-dom';
 import App from '../App';
+import { t } from '../i18n';
 
 describe('App', () => {
   it('renders without crashing', () => {
@@ -20,6 +21,6 @@ describe('App', () => {
         <App />
       </BrowserRouter>,
     );
-    expect(screen.getAllByText('AI 任务编排器')).toHaveLength(2);
+    expect(screen.getAllByText(t.app.title)).toHaveLength(2);
   });
 });

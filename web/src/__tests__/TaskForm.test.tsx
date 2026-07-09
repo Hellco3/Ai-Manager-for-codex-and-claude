@@ -3,6 +3,7 @@ import { render, screen } from '@testing-library/react';
 import { BrowserRouter } from 'react-router-dom';
 import React from 'react';
 import TaskForm from '../components/task/TaskForm';
+import { t } from '../i18n';
 
 describe('TaskForm', () => {
   it('renders correctly in Chinese', () => {
@@ -11,9 +12,9 @@ describe('TaskForm', () => {
         <TaskForm onSubmit={() => {}} isSubmitting={false} />
       </BrowserRouter>,
     );
-    expect(screen.getByText('执行任务')).toBeInTheDocument();
-    expect(screen.getByText('自动')).toBeInTheDocument();
-    expect(screen.getByText('半自动')).toBeInTheDocument();
+    expect(screen.getByText(t.form.execute)).toBeInTheDocument();
+    expect(screen.getByText(t.form.auto)).toBeInTheDocument();
+    expect(screen.getByText(t.form.semiAuto)).toBeInTheDocument();
   });
 
   it('disables submit when empty', () => {
@@ -22,7 +23,7 @@ describe('TaskForm', () => {
         <TaskForm onSubmit={() => {}} isSubmitting={false} />
       </BrowserRouter>,
     );
-    const btn = screen.getByText('执行任务');
+    const btn = screen.getByText(t.form.execute);
     expect(btn).toBeDisabled();
   });
 
@@ -32,6 +33,6 @@ describe('TaskForm', () => {
         <TaskForm onSubmit={() => {}} isSubmitting={true} />
       </BrowserRouter>,
     );
-    expect(screen.getByText('拆解中...')).toBeInTheDocument();
+    expect(screen.getByText(t.form.decomposing)).toBeInTheDocument();
   });
 });

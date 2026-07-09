@@ -23,7 +23,7 @@ export async function runCodexWorker(
     const result = await executeCodexSubtask(subtask, signal, onProgress);
     const durationMs = Date.now() - startedAt;
     logger.info({ subtaskId: subtask.id, durationMs }, 'Codex Worker completed');
-    return result;
+    return result.text;
   } catch (error: any) {
     const durationMs = Date.now() - startedAt;
     logger.error({ subtaskId: subtask.id, durationMs, error }, 'Codex Worker failed');

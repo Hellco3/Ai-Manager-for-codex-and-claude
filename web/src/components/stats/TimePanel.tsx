@@ -1,4 +1,5 @@
 import React from 'react';
+import { t } from '../../i18n.js';
 
 interface Props {
   totalDurationMs: number;
@@ -19,7 +20,7 @@ export default function TimePanel({ totalDurationMs }: Props) {
 
   return (
     <div className="stage-card p-4">
-      <h3 className="text-sm font-semibold text-white mb-2">Total Duration</h3>
+      <h3 className="text-sm font-semibold text-white mb-2">{t.stats.durationTitle}</h3>
       <div className="text-2xl font-bold font-mono gradient-text">{display}</div>
     </div>
   );

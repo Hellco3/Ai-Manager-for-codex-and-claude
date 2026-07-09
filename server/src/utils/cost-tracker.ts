@@ -11,7 +11,8 @@ export class CostTracker {
       'claude-haiku-4-5': { input: 0.8, output: 4 },
     };
 
-    const pricing = PRICING[model] ?? { input: 3, output: 15 };
+    const pricingKey = this.getPricingKey(model);
+    const pricing = PRICING[pricingKey] ?? { input: 3, output: 15 };
     const costUSD = (inputTokens / 1_000_000) * pricing.input + (outputTokens / 1_000_000) * pricing.output;
 
     const existing = this.stats.get(model);
@@ -41,5 +42,10 @@ export class CostTracker {
 
   reset(): void {
     this.stats.clear();
+  }
+
+  private getPricingKey(model: string): string {
+    const [, suffix] = model.split(':');
+    return suffix || model;
   }
 }
