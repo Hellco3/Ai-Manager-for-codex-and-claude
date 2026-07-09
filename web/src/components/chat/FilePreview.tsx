@@ -2,6 +2,7 @@ import React, { useState, useCallback, useEffect, useRef } from 'react';
 import { AnimatePresence, motion, useReducedMotion } from 'framer-motion';
 import type { FileAttachment } from '../../api/upload.js';
 import { getUploadUrl } from '../../api/upload.js';
+import { langName } from '../../i18n.js';
 
 interface FilePreviewProps {
   attachment?: FileAttachment;
@@ -41,6 +42,7 @@ export default function FilePreview({
   onRemove,
   onRetry,
 }: FilePreviewProps) {
+  const isZh = langName === 'zh';
   const reduceMotion = useReducedMotion();
   const [lightboxOpen, setLightboxOpen] = useState(false);
   const dialogRef = useRef<HTMLDivElement>(null);
@@ -152,7 +154,7 @@ export default function FilePreview({
             className="file-card group relative min-w-[220px] shrink-0 flex-col items-stretch"
             role="status"
             aria-live="polite"
-            aria-label={`Uploading ${name}`}
+            aria-label={`${isZh ? '上传中' : 'Uploading'} ${name}`}
           >
             <div className="flex items-center gap-3">
               <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl border border-slate-700/60 bg-slate-800/70 text-[11px] font-semibold tracking-[0.12em] text-slate-300">
@@ -160,14 +162,14 @@ export default function FilePreview({
               </div>
               <div className="min-w-0 flex-1">
                 <p className="truncate text-xs font-medium text-slate-200">{name}</p>
-                <p className="text-[11px] text-slate-500">Uploading...</p>
+                <p className="text-[11px] text-slate-500">{isZh ? '上传中...' : 'Uploading...'}</p>
               </div>
               {onRemove && (
                 <button
                   type="button"
                   onClick={onRemove}
                   className="icon-button h-7 w-7 rounded-full"
-                  aria-label="Remove"
+                  aria-label={isZh ? '移除附件' : 'Remove'}
                 >
                   <svg className="h-[14px] w-[14px]" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M6 18L18 6M6 6l12 12" />
@@ -198,7 +200,7 @@ export default function FilePreview({
               </div>
               <div className="min-w-0 flex-1">
                 <p className="truncate text-xs font-medium text-slate-200">{name}</p>
-                <p className="text-[11px] text-red-300">Upload failed</p>
+                <p className="text-[11px] text-red-300">{isZh ? '上传失败' : 'Upload failed'}</p>
               </div>
             </div>
             <div className="mt-3 flex gap-2 text-[11px]">
@@ -208,12 +210,12 @@ export default function FilePreview({
                   onClick={onRetry}
                   className="rounded-full border border-purple-500/25 bg-purple-500/10 px-2.5 py-1 text-purple-200 transition-colors hover:bg-purple-500/18"
                 >
-                  Retry
+                  {isZh ? '重试' : 'Retry'}
                 </button>
               )}
               {onRemove && (
                 <button type="button" onClick={onRemove} className="rounded-full border border-slate-700/55 bg-slate-900/70 px-2.5 py-1 text-slate-300 transition-colors hover:border-slate-600/70">
-                  Remove
+                  {isZh ? '移除' : 'Remove'}
                 </button>
               )}
             </div>
@@ -227,12 +229,12 @@ export default function FilePreview({
               className="file-card group min-w-[220px] cursor-pointer items-center gap-3"
               onClick={openLightbox}
               onKeyDown={handlePreviewKeyDown}
-              aria-label={`Preview ${name}`}
+              aria-label={`${isZh ? '预览' : 'Preview'} ${name}`}
             >
               <img src={imageSrc} alt={name} className="h-14 w-14 rounded-2xl border border-slate-700/60 object-cover" />
               <div className="min-w-0 flex-1 text-left">
                 <p className="truncate text-xs font-medium text-slate-200">{name}</p>
-                <p className="text-[11px] text-slate-500">Image · {formatSize(size)}</p>
+                <p className="text-[11px] text-slate-500">{isZh ? `图片 · ${formatSize(size)}` : `Image · ${formatSize(size)}`}</p>
               </div>
             </button>
             {onRemove && (
@@ -240,7 +242,7 @@ export default function FilePreview({
                 type="button"
                 onClick={onRemove}
                 className="absolute -right-1 -top-1 flex h-7 w-7 items-center justify-center rounded-full border border-slate-700/60 bg-slate-950/92 text-slate-300 transition-colors hover:border-red-500/40 hover:text-red-200"
-                aria-label="Remove"
+                aria-label={isZh ? '移除附件' : 'Remove'}
               >
                 <svg className="h-[14px] w-[14px]" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M6 18L18 6M6 6l12 12" />
@@ -268,7 +270,7 @@ export default function FilePreview({
                   className="rounded-full border border-purple-500/25 bg-purple-500/10 px-2.5 py-1 text-[11px] text-purple-200 transition-colors hover:bg-purple-500/18"
                   download={name}
                 >
-                  Open
+                  {isZh ? '打开' : 'Open'}
                 </a>
               )}
             </div>
@@ -277,7 +279,7 @@ export default function FilePreview({
                 type="button"
                 onClick={onRemove}
                 className="absolute -right-1 -top-1 flex h-7 w-7 items-center justify-center rounded-full border border-slate-700/60 bg-slate-950/92 text-slate-300 transition-colors hover:border-red-500/40 hover:text-red-200"
-                aria-label="Remove"
+                aria-label={isZh ? '移除附件' : 'Remove'}
               >
                 <svg className="h-[14px] w-[14px]" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M6 18L18 6M6 6l12 12" />
@@ -296,7 +298,7 @@ export default function FilePreview({
             onClick={() => setLightboxOpen(false)}
             role="dialog"
             aria-modal="true"
-            aria-label={`Viewing ${name}`}
+            aria-label={`${isZh ? '查看中' : 'Viewing'} ${name}`}
             tabIndex={-1}
             onKeyDown={handleLightboxKeyDown}
           >
@@ -315,7 +317,7 @@ export default function FilePreview({
                 type="button"
                 onClick={() => setLightboxOpen(false)}
                 className="absolute right-4 top-4 flex h-11 w-11 items-center justify-center rounded-full border border-slate-700/60 bg-slate-950/88 text-slate-100 transition-colors hover:border-slate-500/70"
-                aria-label="Close"
+                aria-label={isZh ? '关闭预览' : 'Close'}
               >
                 <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M6 18L18 6M6 6l12 12" />
