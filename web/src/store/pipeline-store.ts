@@ -281,6 +281,10 @@ export const usePipelineStore = create<PipelineStore>((set, get) => ({
       case 'stage:started':
         set((s) => ({
           currentStage: event.stage,
+          statusMessage: event.stage === 'execute' || event.stage === 'aggregate' ? null : s.statusMessage,
+          statusStep: event.stage === 'execute' || event.stage === 'aggregate' ? null : s.statusStep,
+          statusProgress: event.stage === 'execute' || event.stage === 'aggregate' ? 0 : s.statusProgress,
+          statusStartedAt: event.stage === 'execute' || event.stage === 'aggregate' ? null : s.statusStartedAt,
           stages: {
             ...s.stages,
             review: event.stage === 'execute' && s.stages.review.status === 'running'
@@ -305,6 +309,10 @@ export const usePipelineStore = create<PipelineStore>((set, get) => ({
       case 'stage:awaiting_review':
         set((s) => ({
           currentStage: 'review',
+          statusMessage: null,
+          statusStep: null,
+          statusProgress: 0,
+          statusStartedAt: null,
           decomposition: event.decomposition,
           subtasks: mergeSubtasks(s.subtasks, event.decomposition),
           stages: {
