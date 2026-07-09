@@ -122,30 +122,42 @@ class Orchestrator {
 
     this.broadcastStage(sessionId, 'stage:started', 'execute');
 
+    // Pre-load executor modules once (not inside the while loop)
+    const { executeSubtask } = await import('./executor-claude.js');
+    const { executeCodexSubtask } = await import('./executor-codex.js');
+    const { selectExecutor, withRetry, isRetryableError } = await import('../utils/retry.js');
+
     const decomposition = session.decomposition!;
     const subtasks = decomposition.subtasks;
 
-    // Build dependency graph: track which subtasks are done
+    // Build dependency graph: track which subtasks are done / failed after retries
     const completed = new Set<string>();
+    const hardFailed = new Set<string>(); // subtasks that failed after all retries
     const inFlight = new Set<string>();
     const results = new Map<string, string>();
-    let hasFailure = false;
 
-    while (completed.size < subtasks.length) {
+    while (completed.size + hardFailed.size < subtasks.length) {
       if (signal.aborted) throw new DOMException('Aborted', 'AbortError');
 
       // Find subtasks whose dependencies are all satisfied
+      // Skip subtasks that depend on a hard-failed dependency — they can't proceed
       const ready = subtasks.filter(st =>
         !completed.has(st.id) &&
+        !hardFailed.has(st.id) &&
         !inFlight.has(st.id) &&
         st.dependencies.every(depId => completed.has(depId))
       );
 
       if (ready.length === 0 && inFlight.size === 0) {
         // Nothing can progress — deadlock or all remaining have unsatisfied deps
-        if (hasFailure) {
-          logger.error({ sessionId, completed: completed.size, total: subtasks.length }, 'Execute stage: deadlock due to failures');
-          throw new Error('Cannot proceed: dependent subtasks failed and cannot be retried');
+        if (hardFailed.size > 0) {
+          logger.error({
+            sessionId,
+            completed: completed.size,
+            hardFailed: [...hardFailed],
+            total: subtasks.length,
+          }, 'Execute stage: deadlock due to exhausted retries');
+          throw new Error('Cannot proceed: dependent subtasks failed after all retries');
         }
         // Shouldn't happen with a valid DAG, but wait briefly
         await new Promise(r => setTimeout(r, 200));
@@ -164,6 +176,7 @@ class Orchestrator {
 
       // Launch all in parallel
       const batchPromises = batch.map(async (st) => {
+        let attemptCount = 0;
         try {
           // Notify: subtask started
           sessionStore.updateSubtaskStatus(sessionId, st.id, 'running');
@@ -175,70 +188,108 @@ class Orchestrator {
             timestamp: Date.now(),
           });
 
-          // Execute with real executors
-          const { executeSubtask } = await import('./executor-claude.js');
-          const { executeCodexSubtask } = await import('./executor-codex.js');
-          const { selectExecutor } = (await import('../utils/retry.js'));
-
           const executorType = selectExecutor(st);
           const startedAt = Date.now();
 
-          let result: string;
-          let inputTokens = 0;
-          let outputTokens = 0;
+          // Retry logic: transient errors get up to MAX_RETRIES attempts
+          const maxRetries = config.MAX_RETRIES;
+          const execResult = await withRetry(
+            async (): Promise<{ result: string; inputTokens: number; outputTokens: number }> => {
+              let result: string;
+              let inputTokens = 0;
+              let outputTokens = 0;
 
-          if (executorType === 'codex') {
-            result = await executeCodexSubtask(st, signal, (chunk: string) => {
-              sessionStore.appendSubtaskProgress(sessionId, st.id, chunk);
-              sseManager.broadcast(sessionId, {
-                type: 'subtask:progress',
-                subtaskId: st.id,
-                chunk,
-              });
-            });
-          } else {
-            const execResult = await executeSubtask(st, results, signal, (chunk: string) => {
-              sessionStore.appendSubtaskProgress(sessionId, st.id, chunk);
-              sseManager.broadcast(sessionId, {
-                type: 'subtask:progress',
-                subtaskId: st.id,
-                chunk,
-              });
-            });
-            result = execResult.text;
-            inputTokens = execResult.inputTokens;
-            outputTokens = execResult.outputTokens;
-          }
+              if (executorType === 'codex') {
+                result = await executeCodexSubtask(st, signal, (chunk: string) => {
+                  sessionStore.appendSubtaskProgress(sessionId, st.id, chunk);
+                  sseManager.broadcast(sessionId, {
+                    type: 'subtask:progress',
+                    subtaskId: st.id,
+                    chunk,
+                  });
+                });
+              } else {
+                const claudeResult = await executeSubtask(st, results, signal, (chunk: string) => {
+                  sessionStore.appendSubtaskProgress(sessionId, st.id, chunk);
+                  sseManager.broadcast(sessionId, {
+                    type: 'subtask:progress',
+                    subtaskId: st.id,
+                    chunk,
+                  });
+                });
+                result = claudeResult.text;
+                inputTokens = claudeResult.inputTokens;
+                outputTokens = claudeResult.outputTokens;
+              }
 
+              return { result: result!, inputTokens, outputTokens };
+            },
+            {
+              maxRetries,
+              baseDelayMs: 1000,
+              maxDelayMs: 30000,
+              isRetryable: (err) => {
+                // Never retry abort signals
+                if (err instanceof DOMException && err.name === 'AbortError') return false;
+                return isRetryableError(err);
+              },
+              onRetry: (attempt, err) => {
+                attemptCount = attempt;
+                logger.warn(
+                  { sessionId, subtaskId: st.id, attempt, error: String(err) },
+                  'Retrying subtask after transient error',
+                );
+                sessionStore.incrementRetry(sessionId, st.id);
+                sessionStore.updateSubtaskStatus(sessionId, st.id, 'running');
+                sseManager.broadcast(sessionId, {
+                  type: 'subtask:started',
+                  subtaskId: st.id,
+                  kind: st.kind,
+                  description: `[Retry ${attempt}] ${st.description}`,
+                  timestamp: Date.now(),
+                });
+              },
+            },
+          );
+
+          // Success after possible retries
           const durationMs = Date.now() - startedAt;
-          results.set(st.id, result);
+          results.set(st.id, execResult.result);
           completed.add(st.id);
 
-          sessionStore.setSubtaskResult(sessionId, st.id, result);
+          sessionStore.setSubtaskResult(sessionId, st.id, execResult.result);
           sseManager.broadcast(sessionId, {
             type: 'subtask:completed',
             subtaskId: st.id,
-            result,
+            result: execResult.result,
             durationMs,
           });
 
           // Track cost with real token counts
           const executorModel = executorType === 'codex' ? 'codex-cli' : config.EXECUTOR_MODEL;
-          const stats = costTracker.addEntry(executorModel, inputTokens, outputTokens, durationMs);
+          const stats = costTracker.addEntry(executorModel, execResult.inputTokens, execResult.outputTokens, durationMs);
           sseManager.broadcast(sessionId, { type: 'cost:update', stats });
         } catch (error: any) {
           if (error.name === 'AbortError') throw error;
-          logger.error({ sessionId, subtaskId: st.id, error }, 'Subtask failed');
 
-          const isRetryable = (await import('../utils/retry.js')).isRetryableError(error);
-          sessionStore.setSubtaskError(sessionId, st.id, error.message);
+          // All retries exhausted — mark as hard failure
+          const retryable = isRetryableError(error);
+          const failureKind = retryable ? 'failed (retries exhausted)' : 'failed (non-retryable)';
+          logger.error(
+            { sessionId, subtaskId: st.id, attempts: attemptCount + 1, error },
+            `Subtask ${failureKind}`,
+          );
+
+          hardFailed.add(st.id);
+          sessionStore.setSubtaskError(sessionId, st.id,
+            `[${attemptCount + 1} attempt(s)] ${error.message}`,
+          );
           sseManager.broadcast(sessionId, {
             type: 'subtask:failed',
             subtaskId: st.id,
             error: error.message,
-            retryable: isRetryable,
+            retryable: false, // already exhausted
           });
-          hasFailure = true;
         } finally {
           inFlight.delete(st.id);
         }
