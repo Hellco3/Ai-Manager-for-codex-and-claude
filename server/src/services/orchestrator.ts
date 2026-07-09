@@ -588,22 +588,48 @@ class Orchestrator {
         ],
       });
 
-      for await (const event of stream) {
-        if (signal.aborted) {
+      let idleTimer: ReturnType<typeof setTimeout> | null = null;
+      const IDLE_TIMEOUT_MS = 20000; // 20s without a chunk = stalled
+      const OVERALL_TIMEOUT_MS = 60000; // 60s total stream cap
+
+      const resetIdleTimer = () => {
+        if (idleTimer) clearTimeout(idleTimer);
+        idleTimer = setTimeout(() => {
+          logger.warn({ sessionId }, 'Stream idle timeout — aborting');
           stream.controller.abort();
-          throw new DOMException('Chat response cancelled', 'AbortError');
+        }, IDLE_TIMEOUT_MS);
+      };
+      resetIdleTimer();
+
+      const overallTimer = setTimeout(() => {
+        logger.warn({ sessionId }, 'Stream overall timeout — aborting');
+        stream.controller.abort();
+      }, OVERALL_TIMEOUT_MS);
+
+      try {
+        for await (const event of stream) {
+          // Clear timeouts on each event
+          if (idleTimer) clearTimeout(idleTimer);
+          if (signal.aborted) {
+            stream.controller.abort();
+            throw new DOMException('Chat response cancelled', 'AbortError');
+          }
+          if (event.type === 'content_block_delta' && event.delta.type === 'text_delta') {
+            const text = (event.delta as any).text as string;
+            fullResponse += text;
+            sseManager.broadcast(sessionId, {
+              type: 'message:chunk',
+              chunk: text,
+            });
+          }
+          resetIdleTimer();
         }
-        if (event.type === 'content_block_delta' && event.delta.type === 'text_delta') {
-          const text = (event.delta as any).text as string;
-          fullResponse += text;
-          sseManager.broadcast(sessionId, {
-            type: 'message:chunk',
-            chunk: text,
-          });
-        }
+      } finally {
+        if (idleTimer) clearTimeout(idleTimer);
+        clearTimeout(overallTimer);
       }
 
-      // Finalize the streaming message
+      // Finalize the streaming message (partial is better than nothing on timeout)
       if (fullResponse) {
         sseManager.broadcast(sessionId, {
           type: 'message:complete',
@@ -612,14 +638,36 @@ class Orchestrator {
           timestamp: Date.now(),
         });
         sessionStore.addMessage(sessionId, 'assistant', fullResponse);
+      } else {
+        // No response at all — send a friendly system message
+        const timeoutMsg = 'AI 服务响应超时，请稍后重试或点击「开始任务」重新执行。';
+        sseManager.broadcast(sessionId, {
+          type: 'message:complete',
+          content: timeoutMsg,
+          role: 'system',
+          timestamp: Date.now(),
+        });
+        sessionStore.addMessage(sessionId, 'system', timeoutMsg);
       }
     } catch (error: any) {
-      if (error.name === 'AbortError') throw error;
+      if (error.name === 'AbortError') {
+        // Timeout or cancel with partial response — still deliver what we have
+        if (fullResponse) {
+          sseManager.broadcast(sessionId, {
+            type: 'message:complete',
+            content: fullResponse,
+            role: 'assistant',
+            timestamp: Date.now(),
+          });
+          sessionStore.addMessage(sessionId, 'assistant', fullResponse);
+        }
+        return;
+      }
       logger.error({ sessionId, error }, 'Chat response streaming failed');
-      // Non-fatal: broadcast the real error to chat and continue with re-decomposition
+      // Broadcast error to chat
       const errorMessage = error?.status === 401
         ? 'AI 服务认证失败，请检查相关配置。'
-        : `聊天回复暂时不可用（${error.message || '未知错误'}），系统将继续进行任务重新拆解。`;
+        : `聊天回复暂时不可用（${error.message || '未知错误'}）。`;
       sseManager.broadcast(sessionId, {
         type: 'message:complete',
         content: errorMessage,

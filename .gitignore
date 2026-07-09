@@ -10,3 +10,4 @@ server/dist/
 .ccb/
 server/uploads/*
 !server/uploads/.gitkeep
+.claude/

@@ -76,6 +76,21 @@ export default function ChatFirst() {
     setIsSending(true);
     scrollToBottom(true);
 
+    // Detect confirmation keywords in user message
+    const confirmPattern = /开始执行|开始拆解|开始吧|执行任务|拆解并执行|开始任务|确认执行|run it|start it|execute/;
+    if (sessionId && confirmPattern.test(message.trim()) && !hasPipelineStarted) {
+      addUserMessage(message, attachmentIds.length > 0 ? attachmentIds : undefined);
+      try {
+        await confirmTask(sessionId, undefined, workspaceDir ?? undefined);
+        setIsMobilePanelOpen(false);
+      } catch (err: any) {
+        setSendError(err.message || t.chat.error);
+      } finally {
+        setIsSending(false);
+      }
+      return true;
+    }
+
     if (!sessionId) {
       try {
         const hasStagedAttachments = useUploadStore.getState().items.some(

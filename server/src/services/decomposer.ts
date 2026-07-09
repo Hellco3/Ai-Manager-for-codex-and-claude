@@ -99,12 +99,18 @@ export async function decomposeTask(userTask: string): Promise<{
 
   const startTime = Date.now();
 
-  const response = await anthropic.messages.create({
-    model: config.DECOMPOSER_MODEL,
-    max_tokens: 16000,
-    system: SYSTEM_PROMPT,
-    messages: [{ role: 'user', content: userTask }],
-  });
+  // Wrap with 60s timeout to prevent hanging
+  const response = await Promise.race([
+    anthropic.messages.create({
+      model: config.DECOMPOSER_MODEL,
+      max_tokens: 16000,
+      system: SYSTEM_PROMPT,
+      messages: [{ role: 'user', content: userTask }],
+    }),
+    new Promise<never>((_, reject) =>
+      setTimeout(() => reject(new Error('Decomposition timed out after 60s')), 60000)
+    ),
+  ]);
 
   const durationMs = Date.now() - startTime;
 
