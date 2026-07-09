@@ -1,5 +1,5 @@
 import React, { useState, useCallback, useEffect } from 'react';
-import { t } from '../../i18n.js';
+import { langName, t } from '../../i18n.js';
 
 interface WorkspaceSelectorProps {
   workspaceDir: string | null;
@@ -8,6 +8,7 @@ interface WorkspaceSelectorProps {
 }
 
 export default function WorkspaceSelector({ workspaceDir, onUpdate, disabled }: WorkspaceSelectorProps) {
+  const isZh = langName === 'zh';
   const [editing, setEditing] = useState(false);
   const [value, setValue] = useState(workspaceDir ?? '');
   const [valid, setValid] = useState<boolean | null>(null);
@@ -111,7 +112,7 @@ export default function WorkspaceSelector({ workspaceDir, onUpdate, disabled }: 
       ) : (
         <div className="flex min-w-0 flex-1 items-center gap-3">
           <div className="min-w-0 flex-1">
-            <div className="text-[11px] uppercase tracking-[0.18em] text-slate-500">Workspace</div>
+            <div className="text-[11px] uppercase tracking-[0.18em] text-slate-500">{isZh ? '工作区' : 'Workspace'}</div>
             <span className="mt-1 block truncate text-sm text-slate-300" title={workspaceDir ?? ''}>
               {workspaceDir ?? t.workspace.default}
             </span>
