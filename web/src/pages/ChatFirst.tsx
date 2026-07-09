@@ -462,7 +462,7 @@ export default function ChatFirst() {
 
             {messages.map((msg, idx) => (
               <ChatMessage
-                key={`${msg.timestamp}-${idx}`}
+                key={msg.id ?? `${msg.role}-${msg.timestamp}-${msg.content.slice(0, 32)}`}
                 role={msg.role}
                 content={msg.content}
                 timestamp={msg.timestamp}

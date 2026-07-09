@@ -108,7 +108,7 @@ export default function ChatPanel({ sessionId, variant = 'inline', isOpen, onClo
 
         {messages.map((msg, idx) => (
           <ChatMessage
-            key={`${msg.timestamp}-${idx}`}
+            key={(msg as any).id ?? `${msg.role}-${msg.timestamp}-${msg.content.slice(0, 32)}`}
             role={msg.role}
             content={msg.content}
             timestamp={msg.timestamp}
