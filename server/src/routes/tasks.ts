@@ -198,9 +198,11 @@ router.post('/sessions/:id/message', async (req: Request, res: Response) => {
     return;
   }
 
-  // For terminal/idle states: trigger full continueSession (re-decompose + execute)
+  // For terminal/idle states: stay in chat mode, require explicit confirm to re-decompose
+  // This prevents the system from auto-triggering decomposition on a follow-up message.
+  // The user must click the confirm button (POST /api/sessions/:id/confirm) to start execution.
   const terminalStates: Array<'completed' | 'failed' | 'cancelled' | 'awaiting_review' | 'timed_out'> = ['completed', 'failed', 'cancelled', 'awaiting_review', 'timed_out'];
-  const claimed = sessionStore.tryTransitionStatus(id, terminalStates as any, 'decomposing');
+  const claimed = sessionStore.tryTransitionStatus(id, terminalStates as any, 'chatting');
   if (!claimed) {
     res.status(409).json({ error: 'Session is currently processing. Please wait for it to complete before sending a message.' });
     return;
@@ -208,9 +210,19 @@ router.post('/sessions/:id/message', async (req: Request, res: Response) => {
 
   sessionStore.addMessage(id, 'user', message.trim(), ids.length > 0 ? ids : undefined);
 
+  // Broadcast user message
+  sseManager.broadcast(id, {
+    type: 'message:complete',
+    content: message.trim(),
+    role: 'user',
+    timestamp: Date.now(),
+    attachmentIds: ids.length > 0 ? ids : undefined,
+  });
+
+  // Generate streaming AI reply only — no decomposition. User must explicitly confirm to start.
   const { orchestrator } = await import('../services/orchestrator.js');
-  orchestrator.continueSession(id, message.trim(), ids.length > 0 ? ids : undefined).catch(err => {
-    logger.error({ sessionId: id, error: err }, 'Continue session failed');
+  orchestrator.chatFirstPhase(id, message.trim(), ids.length > 0 ? ids : undefined).catch(err => {
+    logger.error({ sessionId: id, error: err }, 'Chat reply failed');
   });
 
   res.json({ accepted: true });

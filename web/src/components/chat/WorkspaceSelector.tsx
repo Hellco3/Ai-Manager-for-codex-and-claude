@@ -57,7 +57,7 @@ export default function WorkspaceSelector({ workspaceDir, onUpdate, disabled }: 
   return (
     // 审计结论：WorkspaceSelector 已改为与 ChatFirst 新壳层一致的卡片式头部，不再沿用旧工具条样式。
     <div className="workspace-shell flex shrink-0 items-center gap-3 border-b px-3 py-3 md:px-5">
-      <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl border border-purple-500/18 bg-purple-500/8 text-purple-200 shadow-lg shadow-purple-500/10">
+      <div className="accent-icon-surface flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl border">
         <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z" />
         </svg>
@@ -81,7 +81,7 @@ export default function WorkspaceSelector({ workspaceDir, onUpdate, disabled }: 
               }
             }}
             placeholder={t.workspace.placeholder}
-            className="min-w-0 flex-1 rounded-2xl border border-slate-700/50 bg-slate-950/55 px-3 py-2 text-sm text-slate-100 placeholder-slate-500 outline-none transition-colors focus:border-purple-500/40"
+            className="input-surface min-w-0 flex-1 rounded-2xl border px-3 py-2 text-sm outline-none transition-colors focus:border-purple-500/40"
             autoFocus
             disabled={disabled}
           />
@@ -118,7 +118,18 @@ export default function WorkspaceSelector({ workspaceDir, onUpdate, disabled }: 
           </div>
           <button onClick={handleBrowse} className="icon-button h-10 w-10" title={t.workspace.browse} disabled={disabled} type="button">
             <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M12 4v11m0 0l-4-4m4 4l4-4M5 19h14" />
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={1.8}
+                d="M3.75 7.5a1.75 1.75 0 011.75-1.75h4.086a1.75 1.75 0 011.237.513l1.164 1.164a1.75 1.75 0 001.237.513h5.526A1.75 1.75 0 0120.5 9.7v6.8a1.75 1.75 0 01-1.75 1.75H5.5a1.75 1.75 0 01-1.75-1.75V7.5z"
+              />
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={1.8}
+                d="M14.25 11.25h3m-1.5-1.5v3"
+              />
             </svg>
           </button>
           <button

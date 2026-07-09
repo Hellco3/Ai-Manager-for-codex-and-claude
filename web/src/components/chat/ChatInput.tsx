@@ -162,7 +162,7 @@ export default function ChatInput({ onSend, isDisabled, sessionId }: ChatInputPr
 
   return (
     <div
-      className="sticky bottom-0 z-20 border-t border-slate-700/60 bg-slate-950/85 px-3 pt-3 backdrop-blur-xl md:px-5"
+      className="sticky bottom-0 z-20 border-t border-slate-700/60 bg-[color:var(--surface-strong)]/95 px-3 pt-3 backdrop-blur-xl md:px-5"
       style={{ paddingBottom: 'calc(0.75rem + env(safe-area-inset-bottom))' }}
       aria-describedby="upload-hint"
       onDragEnter={handleDragEnter}
@@ -223,7 +223,7 @@ export default function ChatInput({ onSend, isDisabled, sessionId }: ChatInputPr
         </div>
       )}
 
-      <div className="surface-outline-strong flex items-end gap-2 rounded-[30px] border p-2 shadow-[0_-8px_30px_rgba(2,6,23,0.28)]">
+      <div className="surface-outline-strong flex items-end gap-2 rounded-[30px] border p-2 shadow-[0_-8px_30px_rgba(2,6,23,0.16)]">
         <div className="flex shrink-0 items-center gap-2">
           <button
             type="button"
@@ -280,7 +280,7 @@ export default function ChatInput({ onSend, isDisabled, sessionId }: ChatInputPr
           onPaste={handlePaste}
           placeholder={t.chat.placeholder}
           rows={1}
-          className="min-h-[40px] max-h-[200px] flex-1 resize-none bg-transparent px-2 py-2 text-sm leading-6 text-slate-100 placeholder-slate-500 outline-none"
+          className="min-h-[40px] max-h-[200px] flex-1 resize-none bg-transparent px-2 py-2 text-sm leading-6 text-[color:var(--text-primary)] placeholder-[color:var(--text-muted)] outline-none"
           disabled={isDisabled}
           aria-label="Message input"
         />

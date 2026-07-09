@@ -1,19 +1,11 @@
-import React, { useEffect } from 'react';
+import React from 'react';
 import { Routes, Route } from 'react-router-dom';
 import ChatFirst from './pages/ChatFirst.js';
 import TaskSubmit from './pages/TaskSubmit.js';
 import TaskProgress from './pages/TaskProgress.js';
-import { useThemeStore } from './store/theme-store.js';
-import ThemeToggle from './components/common/ThemeToggle.js';
 import { t } from './i18n.js';
 
 export default function App() {
-  const theme = useThemeStore(s => s.theme);
-
-  useEffect(() => {
-    document.documentElement.classList.toggle('light', theme === 'light');
-  }, [theme]);
-
   return (
     <div className="min-h-screen bg-grid">
       <header className="border-b border-slate-700/50 bg-slate-900/50 backdrop-blur-sm sticky top-0 z-50">
@@ -29,7 +21,6 @@ export default function App() {
             </h1>
           </div>
           <div className="flex items-center gap-3">
-            <ThemeToggle />
             <span className="text-xs text-slate-500">{t.app.subtitle}</span>
           </div>
         </div>

@@ -54,73 +54,6 @@
       linear-gradient(90deg, rgba(148, 163, 184, 0.025) 1px, transparent 1px);
     background-size: 40px 40px;
   }
-
-  .light body,
-  .light {
-    background: linear-gradient(180deg, #f8fafc 0%, #e2e8f0 100%);
-    --chat-bg: #eff6ff;
-    --chat-bg-elevated: rgba(255, 255, 255, 0.95);
-    --panel-bg: #e2e8f0;
-    --panel-bg-elevated: rgba(255, 255, 255, 0.94);
-    --surface: rgba(255, 255, 255, 0.82);
-    --surface-strong: rgba(255, 255, 255, 0.95);
-    --surface-soft: rgba(248, 250, 252, 0.96);
-    --surface-border: rgba(148, 163, 184, 0.3);
-    --surface-border-strong: rgba(100, 116, 139, 0.34);
-    --text-primary: #0f172a;
-    --text-secondary: #475569;
-    --text-muted: #64748b;
-    --accent-soft: rgba(124, 58, 237, 0.1);
-    --accent-strong: #7c3aed;
-    --shadow-elevated: 0 18px 40px rgba(148, 163, 184, 0.22);
-    --scrollbar-thumb: rgba(148, 163, 184, 0.5);
-    --scrollbar-thumb-hover: rgba(100, 116, 139, 0.58);
-  }
-
-  .light .bg-grid {
-    background-image:
-      linear-gradient(rgba(100, 116, 139, 0.05) 1px, transparent 1px),
-      linear-gradient(90deg, rgba(100, 116, 139, 0.05) 1px, transparent 1px);
-  }
-
-  .light .stage-card {
-    background: rgba(255, 255, 255, 0.82);
-    border-color: rgba(203, 213, 225, 0.5);
-  }
-
-  .light .stage-card:hover {
-    background: rgba(255, 255, 255, 0.94);
-  }
-
-  .light .stage-card.active {
-    background: rgba(255, 255, 255, 0.9);
-  }
-
-  .light .text-white {
-    color: #1e293b;
-  }
-
-  .light .text-slate-200 {
-    color: #334155;
-  }
-
-  .light .text-slate-300 {
-    color: #475569;
-  }
-
-  .light .text-slate-400 {
-    color: #64748b;
-  }
-
-  .light .text-slate-500,
-  .light .text-slate-600 {
-    color: #94a3b8;
-  }
-
-  .light header {
-    background: rgba(255, 255, 255, 0.7);
-    border-color: rgba(203, 213, 225, 0.5);
-  }
 }
 
 @layer components {
@@ -163,6 +96,56 @@
 
   .panel-badge {
     @apply inline-flex items-center rounded-full border border-purple-500/20 bg-purple-500/12 px-2.5 py-1 text-[11px] font-medium text-purple-200;
+  }
+
+  .surface-chip {
+    @apply inline-flex items-center rounded-2xl border px-3 py-2 text-xs transition-colors duration-200;
+    border-color: var(--surface-border);
+    background: color-mix(in srgb, var(--surface-strong) 92%, transparent);
+    color: var(--text-secondary);
+  }
+
+  .surface-chip:hover {
+    border-color: color-mix(in srgb, var(--accent) 24%, var(--surface-border));
+    color: var(--text-primary);
+  }
+
+  .surface-chip-strong {
+    @apply inline-flex items-center rounded-2xl border px-4 py-2 text-sm font-medium transition-colors duration-200;
+    border-color: color-mix(in srgb, var(--accent) 22%, var(--surface-border));
+    background: color-mix(in srgb, var(--accent) 10%, var(--surface-strong));
+    color: color-mix(in srgb, var(--accent-strong) 75%, var(--text-primary));
+  }
+
+  .surface-chip-strong:hover {
+    background: color-mix(in srgb, var(--accent) 16%, var(--surface-strong));
+  }
+
+  .input-surface {
+    border-color: var(--surface-border);
+    background: color-mix(in srgb, var(--surface-strong) 90%, transparent);
+    color: var(--text-primary);
+  }
+
+  .input-surface::placeholder {
+    color: var(--text-muted);
+  }
+
+  .subtle-panel {
+    border-color: var(--surface-border);
+    background: color-mix(in srgb, var(--surface-strong) 88%, transparent);
+  }
+
+  .subtle-panel-strong {
+    border-color: color-mix(in srgb, var(--accent) 18%, var(--surface-border));
+    background: color-mix(in srgb, var(--surface-strong) 94%, transparent);
+  }
+
+  .accent-icon-surface {
+    border-color: color-mix(in srgb, var(--accent) 20%, var(--surface-border));
+    background: color-mix(in srgb, var(--surface-strong) 94%, transparent);
+    color: color-mix(in srgb, var(--accent-strong) 84%, var(--text-primary));
+    box-shadow: 0 14px 30px color-mix(in srgb, var(--accent) 10%, transparent);
   }
 
   .surface-outline {
@@ -274,8 +257,8 @@
   background: color-mix(in srgb, var(--surface-strong) 98%, transparent);
 }
 
-.drag-overlay {
-  background: rgba(15, 23, 42, 0.9);
+  .drag-overlay {
+    background: rgba(15, 23, 42, 0.9);
   border: 1px dashed rgba(168, 85, 247, 0.42);
   border-radius: 1rem;
   backdrop-filter: blur(12px);
@@ -284,10 +267,6 @@
 .lightbox-backdrop {
   @apply fixed inset-0 z-50 flex items-center justify-center bg-slate-950/90 px-4 py-4 backdrop-blur-sm;
   animation: fadeIn 0.18s ease-out;
-}
-
-.light .lightbox-backdrop {
-  background: rgba(15, 23, 42, 0.78);
 }
 
 .streaming-cursor::after {
