@@ -65,19 +65,25 @@ export default function ChatFirst() {
     })();
   }, [sessionId, hydrated, hydrateFromSession]);
 
+  // Poll for updates when the pipeline hasn't received decomposition yet,
+  // but ONLY while decomposing (not during execution where SSE is sufficient)
   useEffect(() => {
-    if (!sessionId || decomposition || !currentStage) return;
+    if (!sessionId) return;
+    if (decomposition) return;  // already have decomposition, SSE handles the rest
+    if (currentStage && currentStage !== 'decompose' && currentStage !== '') return;
 
+    let cancelled = false;
     const timer = window.setTimeout(async () => {
+      if (cancelled) return;
       try {
         const session = await getTask(sessionId);
-        hydrateFromSession(session);
+        if (!cancelled) hydrateFromSession(session);
       } catch {
       }
-    }, 1200);
+    }, 1500);
 
-    return () => window.clearTimeout(timer);
-  }, [sessionId, currentStage, decomposition, hydrateFromSession]);
+    return () => { cancelled = true; window.clearTimeout(timer); };
+  }, [sessionId, !!decomposition, currentStage, hydrateFromSession]);
 
   const scrollToBottom = useCallback((force = false) => {
     const el = containerRef.current;
@@ -432,7 +438,7 @@ export default function ChatFirst() {
 
       {/* Grid: right panel width adapts — 344px idle, 420px decomposition, 520px execution */}
       <div
-        className={`grid gap-4 transition-[grid-template-columns] duration-500 ease-out ${
+        className={`grid gap-4 min-h-0 flex-1 transition-[grid-template-columns] duration-500 ease-out ${
           isPanelOpen
             ? hasPipelineStarted
               ? 'md:grid-cols-[minmax(0,1fr)_520px]'

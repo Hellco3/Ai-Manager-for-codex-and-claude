@@ -5,7 +5,21 @@ import { useSessionStore } from '../../store/session-store.js';
 import { usePipelineStore } from '../../store/pipeline-store.js';
 import { langName } from '../../i18n.js';
 
-export default function SessionSidebar() {
+const SIDEBAR_COLLAPSED_KEY = 'aiManagerSidebarCollapsed';
+
+function readCollapsed(): boolean {
+  try { return localStorage.getItem(SIDEBAR_COLLAPSED_KEY) === 'true'; } catch { return false; }
+}
+function writeCollapsed(v: boolean): void {
+  try { localStorage.setItem(SIDEBAR_COLLAPSED_KEY, String(v)); } catch {}
+}
+
+interface Props {
+  collapsed: boolean;
+  onToggle: () => void;
+}
+
+export default function SessionSidebar({ collapsed, onToggle }: Props) {
   const isZh = langName === 'zh';
   const navigate = useNavigate();
   const [sessions, setSessions] = useState<SessionSummary[]>([]);
@@ -172,9 +186,22 @@ export default function SessionSidebar() {
   return (
     <>
       {/* Desktop sidebar */}
-      <aside className="flex h-full w-[224px] shrink-0 flex-col border-r border-slate-700/50 bg-slate-900/50 backdrop-blur-sm max-md:hidden">
-        {sidebarContent}
-      </aside>
+      {!collapsed && (
+        <aside className="flex h-full w-[224px] shrink-0 flex-col border-r border-slate-700/50 bg-slate-900/50 backdrop-blur-sm max-md:hidden">
+          {sidebarContent}
+        </aside>
+      )}
+
+      {/* Collapse toggle — desktop */}
+      <button
+        onClick={onToggle}
+        className="hidden md:flex h-full w-10 shrink-0 flex-col items-center justify-center border-r border-slate-700/50 bg-slate-900/30 text-slate-500 transition-colors hover:bg-slate-800/50 hover:text-slate-300"
+        title={collapsed ? (isZh ? '展开侧边栏' : 'Expand sidebar') : (isZh ? '收起侧边栏' : 'Collapse sidebar')}
+      >
+        <svg className={`h-4 w-4 transition-transform ${collapsed ? 'rotate-180' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M15 19l-7-7 7-7" />
+        </svg>
+      </button>
 
       {/* Mobile hamburger */}
       <button

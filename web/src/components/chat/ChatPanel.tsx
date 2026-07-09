@@ -176,7 +176,7 @@ export default function ChatPanel({ sessionId, variant = 'inline', isOpen, onClo
   }
 
   return (
-    <div className="stage-card flex flex-col overflow-hidden p-0" style={{ height: 'calc(100vh - 160px)', minHeight: '400px' }}>
+    <div className="stage-card flex flex-col overflow-hidden p-0 h-full" style={{ minHeight: '400px' }}>
       {panelContent}
     </div>
   );
