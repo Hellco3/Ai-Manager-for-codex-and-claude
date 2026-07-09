@@ -10,6 +10,7 @@ import ChatInput from '../components/chat/ChatInput.js';
 import WorkspaceSelector from '../components/chat/WorkspaceSelector.js';
 import PipelineView from '../components/pipeline/PipelineView.js';
 import SubtaskList from '../components/pipeline/SubtaskList.js';
+import DecompositionReview from '../components/task/DecompositionReview.js';
 import CostPanel from '../components/stats/CostPanel.js';
 import TimePanel from '../components/stats/TimePanel.js';
 import { useUploadStore } from '../store/upload-store.js';
@@ -26,6 +27,7 @@ export default function ChatFirst() {
   const stages = usePipelineStore((s) => s.stages);
   const subtasks = usePipelineStore((s) => s.subtasks);
   const currentStage = usePipelineStore((s) => s.currentStage);
+  const decomposition = usePipelineStore((s) => s.decomposition);
   const isComplete = usePipelineStore((s) => s.isComplete);
   const isError = usePipelineStore((s) => s.isError);
   const errorMessage = usePipelineStore((s) => s.errorMessage);
@@ -195,6 +197,7 @@ export default function ChatFirst() {
 
   const hasPipelineStarted = !!currentStage && currentStage !== 'decompose' && Object.keys(subtasks).length > 0;
   const showConfirm = !!sessionId && !hasPipelineStarted && !isComplete;
+  const showDecomposition = !!decomposition && (currentStage === 'decompose' || currentStage === 'execute' || currentStage === 'aggregate' || hasPipelineStarted || isComplete);
   const stageLabels = t.stages;
   const stageIcons: Record<string, string> = { decompose: 'D', review: 'R', execute: 'E', aggregate: 'A' };
 
@@ -232,7 +235,72 @@ export default function ChatFirst() {
           </div>
         )}
 
-        {hasPipelineStarted ? (
+        {showDecomposition && decomposition ? (
+          <div className="space-y-4">
+            {/* Decomposition overview */}
+            <div className="subtle-panel-strong rounded-2xl border p-4">
+              <p className="text-xs font-medium uppercase tracking-wider text-purple-300/80 mb-2">{t.stages.decompose}</p>
+              <p className="text-sm leading-6 text-slate-300">{decomposition.overview}</p>
+              <p className="mt-2 text-[11px] text-slate-500">
+                {decomposition.executionOrder.join(' → ')}
+                {decomposition.estimatedTimeMinutes && (
+                  <span className="ml-2">· est. {decomposition.estimatedTimeMinutes}min</span>
+                )}
+              </p>
+            </div>
+
+            {hasPipelineStarted ? (
+              <>
+                <div className="subtle-panel rounded-2xl border p-4">
+                  <PipelineView
+                    stages={stages}
+                    currentStage={currentStage}
+                    stageLabels={stageLabels}
+                    stageIcons={stageIcons}
+                    subtasks={subtasks}
+                  />
+                </div>
+                <div className="grid gap-3">
+                  <CostPanel costStats={costStats} totalCost={totalCost} totalDurationMs={totalDurationMs} />
+                  <TimePanel totalDurationMs={totalDurationMs} />
+                </div>
+                {Object.keys(subtasks).length > 0 && (
+                  <div className="subtle-panel rounded-2xl border p-4">
+                    <SubtaskList subtasks={subtasks} />
+                  </div>
+                )}
+              </>
+            ) : (
+              <div className="subtle-panel rounded-2xl border p-4">
+                <p className="text-xs font-medium uppercase tracking-wider text-slate-500 mb-3">{t.subtask.title}</p>
+                <div className="space-y-2">
+                  {decomposition.subtasks.map((st, idx) => {
+                    const kindColors: Record<string, string> = {
+                      code: 'border-cyan-500/20 bg-cyan-500/8 text-cyan-300',
+                      analysis: 'border-purple-500/20 bg-purple-500/8 text-purple-300',
+                      design: 'border-pink-500/20 bg-pink-500/8 text-pink-300',
+                      research: 'border-amber-500/20 bg-amber-500/8 text-amber-300',
+                      integration: 'border-teal-500/20 bg-teal-500/8 text-teal-300',
+                    };
+                    const kindClass = kindColors[st.kind] ?? 'border-slate-700/30 bg-slate-800/30';
+                    return (
+                      <div key={st.id} className={`rounded-xl border px-3 py-2.5 ${kindClass}`}>
+                        <div className="flex items-center gap-2 mb-1">
+                          <span className="text-[10px] font-mono text-slate-500">{idx + 1}.</span>
+                          <span className="text-[10px] uppercase font-semibold tracking-wider">{st.kind}</span>
+                          {st.dependencies.length > 0 && (
+                            <span className="text-[10px] text-slate-500">→ {st.dependencies.join(', ')}</span>
+                          )}
+                        </div>
+                        <p className="text-xs leading-5">{st.description}</p>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
+          </div>
+        ) : hasPipelineStarted ? (
           <>
             <div className="subtle-panel rounded-2xl border p-4">
               <PipelineView
