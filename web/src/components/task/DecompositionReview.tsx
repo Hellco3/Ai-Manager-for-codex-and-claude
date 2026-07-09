@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import type { TaskDecomposition, Subtask, SubtaskKind } from '@ai_manager/shared';
 import { approveDecomposition } from '../../api/client.js';
 import StatusBadge from '../common/StatusBadge.js';
+import { langName } from '../../i18n.js';
 
 interface Props {
   decomposition: TaskDecomposition;
@@ -19,6 +20,7 @@ const KIND_COLORS: Record<SubtaskKind, string> = {
 };
 
 export default function DecompositionReview({ decomposition, sessionId, onApproved, onRejected }: Props) {
+  const isZh = langName === 'zh';
   const [subtasks, setSubtasks] = useState<Subtask[]>(decomposition.subtasks);
   const [approving, setApproving] = useState(false);
 
@@ -36,7 +38,7 @@ export default function DecompositionReview({ decomposition, sessionId, onApprov
     <div className="mt-6 stage-card active">
       <div className="flex items-center justify-between mb-4">
         <div>
-          <h3 className="text-lg font-semibold text-white">Review Decomposition</h3>
+          <h3 className="text-lg font-semibold text-white">{isZh ? '审核拆解结果' : 'Review Decomposition'}</h3>
           <p className="text-sm text-slate-400 mt-1">{decomposition.overview}</p>
         </div>
         <div className="flex gap-2">
@@ -44,14 +46,14 @@ export default function DecompositionReview({ decomposition, sessionId, onApprov
             onClick={onRejected}
             className="px-4 py-2 rounded-lg bg-slate-700/50 text-slate-400 text-sm hover:bg-slate-700 transition-all"
           >
-            Reject
+            {isZh ? '拒绝' : 'Reject'}
           </button>
           <button
             onClick={handleApprove}
             disabled={approving}
             className="px-4 py-2 rounded-lg bg-gradient-to-r from-blue-600 to-purple-600 text-white text-sm font-medium hover:from-blue-500 hover:to-purple-500 transition-all disabled:opacity-40"
           >
-            {approving ? 'Approving...' : 'Approve & Execute'}
+            {approving ? (isZh ? '确认中...' : 'Approving...') : (isZh ? '确认并执行' : 'Approve & Execute')}
           </button>
         </div>
       </div>
@@ -66,12 +68,12 @@ export default function DecompositionReview({ decomposition, sessionId, onApprov
                 <span className={`px-2 py-0.5 rounded text-[10px] font-medium uppercase border ${KIND_COLORS[st.kind]}`}>
                   {st.kind}
                 </span>
-                <span className="text-xs text-slate-500">Priority: {st.priority}</span>
-                <span className="text-xs text-slate-500">Complexity: {st.estimatedComplexity}</span>
+                <span className="text-xs text-slate-500">{isZh ? '优先级' : 'Priority'}: {st.priority}</span>
+                <span className="text-xs text-slate-500">{isZh ? '复杂度' : 'Complexity'}: {st.estimatedComplexity}</span>
               </div>
               <p className="text-sm text-slate-300">{st.description}</p>
               {st.dependencies.length > 0 && (
-                <p className="text-xs text-slate-600 mt-1">Depends on: {st.dependencies.join(', ')}</p>
+                <p className="text-xs text-slate-600 mt-1">{isZh ? '依赖' : 'Depends on'}: {st.dependencies.join(', ')}</p>
               )}
             </div>
           </div>
@@ -80,13 +82,13 @@ export default function DecompositionReview({ decomposition, sessionId, onApprov
 
       {/* Execution Order */}
       <div className="mt-4 pt-3 border-t border-slate-700/50">
-        <span className="text-xs text-slate-500">Execution order: </span>
+        <span className="text-xs text-slate-500">{isZh ? '执行顺序：' : 'Execution order: '}</span>
         <span className="text-xs text-slate-400 font-mono">
           {decomposition.executionOrder.join(' → ')}
         </span>
         {decomposition.estimatedTimeMinutes && (
           <span className="text-xs text-slate-600 ml-2">
-            (est. {decomposition.estimatedTimeMinutes} min)
+            {isZh ? `（预计 ${decomposition.estimatedTimeMinutes} 分钟）` : `(est. ${decomposition.estimatedTimeMinutes} min)`}
           </span>
         )}
       </div>
