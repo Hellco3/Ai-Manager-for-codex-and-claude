@@ -427,7 +427,7 @@ class Orchestrator {
 
     const walk = async (dir: string, depth: number): Promise<void> => {
       if (depth > 4) return;
-      let entries: Awaited<ReturnType<typeof fs.readdir>>;
+      let entries: import('fs').Dirent[];
       try {
         entries = await fs.readdir(dir, { withFileTypes: true });
       } catch {
@@ -435,17 +435,18 @@ class Orchestrator {
       }
 
       for (const entry of entries) {
-        const fullPath = path.join(dir, entry.name);
+        const entryName = entry.name as string;
+        const fullPath = path.join(dir, entryName);
         if (!fullPath.startsWith(resolvedRoot)) continue;
 
         if (entry.isDirectory()) {
-          if (['node_modules', '.git', 'dist', 'build', '.next'].includes(entry.name)) continue;
+          if (['node_modules', '.git', 'dist', 'build', '.next'].includes(entryName)) continue;
           await walk(fullPath, depth + 1);
           continue;
         }
 
         if (!entry.isFile()) continue;
-        if (!allowedExts.has(path.extname(entry.name).toLowerCase())) continue;
+        if (!allowedExts.has(path.extname(entryName).toLowerCase())) continue;
 
         try {
           const stat = await fs.stat(fullPath);

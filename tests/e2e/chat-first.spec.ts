@@ -209,12 +209,16 @@ async function installApiMock(page: import('@playwright/test').Page) {
             type: 'session:complete',
             result: {
               summary: 'Python calculator implementation complete.',
-              deliverables: ['calculator.py', 'basic validation notes'],
+              subtaskResults: {
+                plan: 'Plan complete',
+                code: 'calculator.py created',
+                verify: 'Validation passed',
+              },
               totalCost: 0.0123,
               totalDurationMs: 610,
               costBreakdown: [
-                { model: 'claude', inputTokens: 100, outputTokens: 200, costUSD: 0.0061, durationMs: 280 },
-                { model: 'codex', inputTokens: 120, outputTokens: 260, costUSD: 0.0062, durationMs: 330 },
+                { model: 'claude-opus-4-8', inputTokens: 100, outputTokens: 200, costUSD: 0.0061, durationMs: 280 },
+                { model: 'claude-sonnet-5', inputTokens: 120, outputTokens: 260, costUSD: 0.0062, durationMs: 330 },
               ],
             },
           });

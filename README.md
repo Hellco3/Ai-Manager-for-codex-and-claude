@@ -137,9 +137,11 @@ npm run dev
 
 ```bash
 npm run dev          # 启动开发服务器 (server:3001 + web:5173)
-npm test             # 运行全部 24 项测试 (7 server + 17 web)
+npm test             # 运行全部 25 项测试 (8 server + 17 web)
 npm run test:server  # 仅运行服务端测试
 npm run test:web     # 仅运行前端测试
+npm run test:e2e     # 运行 Playwright E2E 测试
+npm run build        # 生产构建 (server + web)
 ```
 
 ## API
