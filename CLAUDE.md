@@ -1,10 +1,10 @@
-# Project: AI Manager for Codex & Claude
+# Project: AI Conductor for Codex & Claude
 
 ## Overview
 
 AI task orchestration platform (H5 web app). User submits a task → Claude decomposes into subtasks → distributes to Codex CLI + Claude API in parallel → aggregates results. Real-time SwimLane progress visualization with SSE streaming.
 
-**GitHub**: github.com/Hellco3/Ai-Manager-for-codex-and-claude
+**GitHub**: github.com/Hellco3/Ai-Conductor-for-codex-and-claude
 **Directory**: `E:/Code/ai_manager`
 
 ## Quick Start
@@ -192,7 +192,7 @@ npm test                                                               # All tes
 ## Git Rules
 
 - **Every code iteration gets a git commit** with descriptive message
-- Push to `github.com/Hellco3/Ai-Manager-for-codex-and-claude`
+- Push to `github.com/Hellco3/Ai-Conductor-for-codex-and-claude`
 - Working tree should be clean after each task
 
 ## Known Issues / Future
