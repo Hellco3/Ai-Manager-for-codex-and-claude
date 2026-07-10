@@ -26,10 +26,13 @@ export const config = {
   // claude-sonnet-5   → deepseek-v4-pro
   DECOMPOSER_MODEL: process.env.DECOMPOSER_MODEL || 'claude-opus-4-8',
   EXECUTOR_MODEL: process.env.EXECUTOR_MODEL || 'claude-sonnet-5',
+  CLAUDE_CODE_CLI_PATH: process.env.CLAUDE_CODE_CLI_PATH || 'claude',
+  CLAUDE_CODE_TIMEOUT_MS: parseInt(process.env.CLAUDE_CODE_TIMEOUT_MS || '600000', 10),
 
   // Codex CLI
   CODEX_CLI_PATH: process.env.CODEX_CLI_PATH || 'codex',
-  CODEX_MODEL: process.env.CODEX_MODEL || 'claude-sonnet-5',
+  // Leave undefined to use the model configured by the local Codex CLI.
+  CODEX_MODEL: process.env.CODEX_MODEL || undefined,
   CODEX_TIMEOUT_MS: parseInt(process.env.CODEX_TIMEOUT_MS || '300000', 10),
   CODEX_WORKER_TIMEOUT_MS: parseInt(process.env.CODEX_WORKER_TIMEOUT_MS || '180000', 10),
 

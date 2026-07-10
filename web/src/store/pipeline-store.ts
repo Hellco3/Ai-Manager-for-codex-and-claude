@@ -286,10 +286,14 @@ export const usePipelineStore = create<PipelineStore>((set, get) => ({
       case 'stage:started':
         set((s) => ({
           currentStage: event.stage,
-          statusMessage: event.stage === 'execute' || event.stage === 'aggregate' ? null : s.statusMessage,
-          statusStep: event.stage === 'execute' || event.stage === 'aggregate' ? null : s.statusStep,
-          statusProgress: event.stage === 'execute' || event.stage === 'aggregate' ? 0 : s.statusProgress,
-          statusStartedAt: event.stage === 'execute' || event.stage === 'aggregate' ? null : s.statusStartedAt,
+          statusMessage: event.stage === 'execute'
+            ? '正在执行子任务...'
+            : event.stage === 'aggregate'
+              ? '正在汇总结果...'
+              : s.statusMessage,
+          statusStep: event.stage,
+          statusProgress: event.stage === 'execute' ? 30 : event.stage === 'aggregate' ? 80 : s.statusProgress,
+          statusStartedAt: s.statusStartedAt ?? event.timestamp,
           stages: {
             ...s.stages,
             review: event.stage === 'execute' && s.stages.review.status === 'running'
@@ -353,13 +357,16 @@ export const usePipelineStore = create<PipelineStore>((set, get) => ({
         set((s) => {
           const existing = s.subtasks[event.subtaskId];
           return {
+            statusMessage: `正在执行：${event.description}`,
+            statusStep: 'execute',
+            statusStartedAt: s.statusStartedAt ?? event.timestamp,
             subtasks: {
               ...s.subtasks,
               [event.subtaskId]: {
                 ...(existing ?? {
                   subtask: {
                     id: event.subtaskId,
-                    kind: 'code',
+                    kind: event.kind as any,
                     description: event.description,
                     dependencies: [],
                     priority: 5,
@@ -403,6 +410,8 @@ export const usePipelineStore = create<PipelineStore>((set, get) => ({
           }
 
           return {
+            statusMessage: `子任务已完成，正在继续执行...`,
+            statusStep: 'execute',
             subtasks: {
               ...s.subtasks,
               [event.subtaskId]: {

@@ -60,6 +60,7 @@ export async function executeCodexSubtask(
   signal: AbortSignal,
   onProgress: (chunk: string) => void,
   workspaceDir?: string,
+  imagePaths: string[] = [],
 ): Promise<CodexExecutionResult> {
   const codexPath = config.CODEX_CLI_PATH;
   const cwd = workspaceDir ?? process.cwd();
@@ -67,18 +68,26 @@ export async function executeCodexSubtask(
   logger.info({ subtaskId: subtask.id, codexPath, model: config.CODEX_MODEL, cwd }, 'Executing Codex subtask');
 
   return new Promise<CodexExecutionResult>((resolve, reject) => {
+    const roleInstruction = subtask.kind === 'vision'
+      ? '这是图片理解任务。仔细读取通过 --image 提供的图片，完成 OCR、分析或比较；不要把任务转交给 Claude。'
+      : subtask.kind === 'image_generation'
+        ? '这是图片生成/编辑任务。必须使用当前 Codex 环境可用的 imagegen 图像生成能力，并把最终 PNG 或 WebP 文件保存到当前工作区；不要只返回提示词或文字说明，也不要把任务转交给 Claude。'
+        : 'Provide your complete implementation with code. No explanations unless strictly necessary.';
+    const imageArgs = imagePaths.flatMap((imagePath) => ['--image', imagePath]);
+    const modelArgs = config.CODEX_MODEL ? ['--model', config.CODEX_MODEL] : [];
     const args = [
       'exec',
       '--skip-git-repo-check',
       '--json',
       '--dangerously-bypass-approvals-and-sandbox',
-      '--model', config.CODEX_MODEL,
+      ...modelArgs,
       '-C', cwd,
+      ...imageArgs,
       '--',
       `[CODING TASK] ${subtask.description}
 
 尽量使用简体中文输出解释、总结、注释和类似提交说明的文字；如果任务明确要求其他语言，再按任务要求处理。
-Provide your complete implementation with code. No explanations unless strictly necessary.`,
+${roleInstruction}`,
     ];
 
     const proc = spawn(codexPath, args, {

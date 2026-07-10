@@ -1,7 +1,7 @@
 import { z } from 'zod';
 
 // --- Subtask Kind ---
-export const SubtaskKind = z.enum(['code', 'analysis', 'design', 'research', 'integration']);
+export const SubtaskKind = z.enum(['code', 'vision', 'image_generation', 'analysis', 'design', 'research', 'integration']);
 export type SubtaskKind = z.infer<typeof SubtaskKind>;
 
 // --- Subtask Complexity ---

@@ -105,6 +105,11 @@ export class AttachmentStore {
       .filter((a): a is FileAttachment => a != null);
   }
 
+  getLocalPath(attachment: FileAttachment): string | undefined {
+    const resolved = path.resolve(UPLOAD_ROOT, attachment.storageKey);
+    return resolved.startsWith(UPLOAD_ROOT + path.sep) ? resolved : undefined;
+  }
+
   bindToMessage(ids: string[], messageId: string): void {
     for (const id of ids) {
       const record = this.attachments.get(id);

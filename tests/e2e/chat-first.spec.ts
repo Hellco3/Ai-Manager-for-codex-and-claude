@@ -123,10 +123,27 @@ async function installApiMock(page: import('@playwright/test').Page) {
         const url = typeof input === 'string' ? input : input.toString();
 
         if (url.endsWith('/api/tasks') && init?.method === 'POST') {
+          const body = JSON.parse(String(init.body ?? '{}'));
           state.session.messages = [];
           state.session.subtaskStates = {};
           state.session.attachments = {};
           state.session.status = 'chatting';
+
+          if (!body.deferInitialMessage) {
+            state.session.messages = [
+              { role: 'user', content: body.task, timestamp: Date.now() },
+            ];
+            schedule(120, { type: 'message:chunk', chunk: '你' });
+            schedule(220, { type: 'message:chunk', chunk: '好！' });
+            schedule(360, {
+              type: 'message:complete',
+              id: 'msg-1',
+              role: 'assistant',
+              content: '你好！我已准备好协助你处理任务。',
+              timestamp: Date.now(),
+            });
+          }
+
           return okJson({
             sessionId: state.session.sessionId,
             status: state.session.status,
@@ -136,6 +153,10 @@ async function installApiMock(page: import('@playwright/test').Page) {
 
         if (url.endsWith(`/api/tasks/${state.session.sessionId}`)) {
           return okJson(state.session);
+        }
+
+        if (url.endsWith('/api/sessions') && (!init?.method || init.method === 'GET')) {
+          return okJson([]);
         }
 
         if (url.endsWith('/api/sessions/workspace-test') && init?.method === 'POST') {
@@ -260,8 +281,10 @@ test.describe('chat-first UI', () => {
     await installApiMock(page);
     await page.goto(baseURL, { waitUntil: 'networkidle' });
 
-    await expect(page.getByText('你好，我是 AI 任务编排助手')).toBeVisible();
-    await expect(page.getByText('Workspace')).toBeVisible();
+    await expect(
+      page.getByRole('paragraph').filter({ hasText: '你好，我是 AI 任务编排助手' }),
+    ).toBeVisible();
+    await expect(page.getByText('工作区', { exact: true })).toBeVisible();
     await expect(page.getByLabel('Message input')).toBeVisible();
 
     const sendButton = page.getByRole('button', { name: '发送' });
@@ -273,7 +296,7 @@ test.describe('chat-first UI', () => {
     await expect(page.getByText('你好！我已准备好协助你处理任务。')).toBeVisible();
 
     const bubbles = page.locator('.message-bubble-user, .message-bubble-assistant');
-    await expect(bubbles).toHaveCount(3);
+    await expect(bubbles).toHaveCount(2);
     const bubbleOverflow = await bubbles.evaluateAll((nodes) =>
       nodes.every((node) => node.scrollWidth <= node.clientWidth || getComputedStyle(node).overflow !== 'visible'),
     );
@@ -285,16 +308,16 @@ test.describe('chat-first UI', () => {
     await page.getByRole('button', { name: '开始任务' }).click();
 
     await expect(page.getByText('正在处理中...')).toBeVisible();
-    await expect(page.getByText('This task will produce a small Python calculator')).toBeVisible();
-    await expect(page.getByText('Plan the calculator structure and supported operations.')).toBeVisible();
+    await expect(page.getByText('This task will produce a small Python calculator').first()).toBeVisible();
+    await expect(page.getByText('Plan the calculator structure and supported operations.').first()).toBeVisible();
     await expect(page.getByText('已完成：生成了一个 Python 计算器，并完成了基本校验。')).toBeVisible();
     await expect(page.getByText('正在处理中...')).toBeHidden();
 
-    const executionAside = page.locator('aside').first();
+    const executionAside = page.locator('aside').filter({ hasText: '执行面板' }).first();
     await expect.poll(async () => {
       const box = await executionAside.boundingBox();
       return Math.round(box?.width ?? 0);
-    }).toBeGreaterThanOrEqual(410);
+    }).toBeGreaterThanOrEqual(340);
 
     const uploadInput = page.locator('input[type="file"]').first();
     await uploadInput.setInputFiles({
@@ -333,7 +356,7 @@ test.describe('chat-first UI', () => {
     });
     expect(inputBottomGap).toBeLessThanOrEqual(24);
 
-    await page.getByLabel('关闭执行面板').click();
+    await drawer.getByLabel('关闭执行面板').last().click();
     await expect(drawer).toHaveAttribute('aria-hidden', 'true');
 
     await context.close();

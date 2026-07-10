@@ -15,7 +15,7 @@ const DECOMPOSITION_JSON_SCHEMA = {
           id: { type: 'string', description: 'Unique subtask identifier (e.g., "task-1", "task-2")' },
           kind: {
             type: 'string',
-            enum: ['code', 'analysis', 'design', 'research', 'integration'],
+            enum: ['code', 'vision', 'image_generation', 'analysis', 'design', 'research', 'integration'],
             description: 'Type of subtask.',
           },
           description: { type: 'string', description: 'Detailed description of what this subtask should accomplish' },
@@ -50,7 +50,9 @@ const DECOMPOSITION_JSON_SCHEMA = {
 const SYSTEM_PROMPT = `You are an expert task decomposition engine. Given a user's task description, decompose it into discrete, independently executable subtasks.
 
 ## Task Kind Classification Rules:
-- **code**: Only use this when the subtask truly requires writing or modifying source code / scripts / automation logic. These will be executed by a coding agent (Codex).
+- **code**: Only use this when the subtask truly requires writing or modifying source code / scripts / automation logic. These will be executed by Claude.
+- **vision**: Reading, understanding, comparing, OCR, or extracting information from images. Always executed by Codex.
+- **image_generation**: Generating or editing image assets. Always executed by Codex; require the result to be saved as PNG/WebP in the workspace.
 - **analysis**: Analyzing code, data, or requirements; answering questions; code review
 - **design**: Designing architecture, UI/UX, data models, API schemas
 - **research**: Investigating external information, APIs, libraries, or documentation
@@ -67,6 +69,7 @@ const SYSTEM_PROMPT = `You are an expert task decomposition engine. Given a user
 8. MINIMIZE dependencies: if two subtasks can run in parallel, DON'T add artificial dependencies between them
 9. For planning/report/document tasks, prefer analysis/design/research unless the step explicitly needs executable code
 10. Generating a Word/PDF/plan document should NOT be marked as "code" unless the subtask is specifically about implementing the generation script itself
+11. Any image understanding/OCR step MUST use "vision"; any image generation/editing step MUST use "image_generation". Never assign these two roles to Claude kinds.
 
 ## Subtask Granularity:
 - A subtask should take 2-15 minutes of agent work
@@ -81,7 +84,7 @@ You MUST respond with ONLY valid JSON matching the specified schema. No other te
 
 CRITICAL: Your JSON response MUST include ALL of these top-level fields:
 - "overview" (string): brief overview of your decomposition strategy
-- "subtasks" (array): each subtask MUST have: id (string), kind (one of: code/analysis/design/research/integration), description (string), dependencies (string[]), priority (integer 1-10), estimatedComplexity (one of: low/medium/high)
+- "subtasks" (array): each subtask MUST have: id (string), kind (one of: code/vision/image_generation/analysis/design/research/integration), description (string), dependencies (string[]), priority (integer 1-10), estimatedComplexity (one of: low/medium/high)
 - "executionOrder" (string[]): ordered list of all subtask IDs`;
 
 /**

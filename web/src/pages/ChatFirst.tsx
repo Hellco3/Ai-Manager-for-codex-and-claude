@@ -130,7 +130,7 @@ export default function ChatFirst() {
     scrollToBottom(true);
 
     // Detect confirmation keywords in user message
-    const confirmPattern = /开始执行|开始拆解|开始吧|执行任务|拆解并执行|开始任务|确认执行|run it|start it|execute/i;
+    const confirmPattern = /开始执行|开始拆解|开始生成|开始吧|执行任务|拆解并执行|开始任务|确认执行|run it|start it|execute/i;
     if (sessionId && confirmPattern.test(message.trim()) && !hasPipelineStarted) {
       addUserMessage(message, attachmentIds.length > 0 ? attachmentIds : undefined);
       try {
@@ -321,6 +321,8 @@ export default function ChatFirst() {
                   {decomposition.subtasks.map((st, idx) => {
                     const kindColors: Record<string, string> = {
                       code: 'border-cyan-500/20 bg-cyan-500/8 text-cyan-300',
+                      vision: 'border-blue-500/20 bg-blue-500/8 text-blue-300',
+                      image_generation: 'border-fuchsia-500/20 bg-fuchsia-500/8 text-fuchsia-300',
                       analysis: 'border-purple-500/20 bg-purple-500/8 text-purple-300',
                       design: 'border-pink-500/20 bg-pink-500/8 text-pink-300',
                       research: 'border-amber-500/20 bg-amber-500/8 text-amber-300',

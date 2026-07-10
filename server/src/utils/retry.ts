@@ -78,8 +78,10 @@ export async function withTimeout<T>(
  */
 export function selectExecutor(subtask: Subtask): 'claude' | 'codex' {
   switch (subtask.kind) {
-    case 'code':
+    case 'vision':
+    case 'image_generation':
       return 'codex';
+    case 'code':
     case 'analysis':
     case 'design':
     case 'research':

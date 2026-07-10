@@ -13,6 +13,8 @@ interface Props {
 
 const KIND_COLORS: Record<SubtaskKind, string> = {
   code: 'bg-cyan-500/20 text-cyan-400 border-cyan-500/30',
+  vision: 'bg-blue-500/20 text-blue-300 border-blue-500/30',
+  image_generation: 'bg-fuchsia-500/20 text-fuchsia-300 border-fuchsia-500/30',
   analysis: 'bg-purple-500/20 text-purple-400 border-purple-500/30',
   design: 'bg-pink-500/20 text-pink-400 border-pink-500/30',
   research: 'bg-amber-500/20 text-amber-400 border-amber-500/30',

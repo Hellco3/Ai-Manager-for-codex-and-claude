@@ -83,7 +83,9 @@ describe('Config', () => {
 describe('Retry utils', () => {
   it('selectExecutor routes correctly', async () => {
     const { selectExecutor } = await import('../utils/retry.js');
-    expect(selectExecutor({ kind: 'code' } as any)).toBe('codex');
+    expect(selectExecutor({ kind: 'code' } as any)).toBe('claude');
+    expect(selectExecutor({ kind: 'vision' } as any)).toBe('codex');
+    expect(selectExecutor({ kind: 'image_generation' } as any)).toBe('codex');
     expect(selectExecutor({ kind: 'analysis' } as any)).toBe('claude');
     expect(selectExecutor({ kind: 'design' } as any)).toBe('claude');
   });
@@ -103,5 +105,26 @@ describe('CostTracker', () => {
     t.addEntry('claude-opus-4-8', 500, 200, 800);
     expect(t.getAll()).toHaveLength(2);
     expect(t.getTotalCost()).toBeGreaterThan(0);
+  });
+});
+
+describe('File intent classification', () => {
+  it('does not treat file generation requirements as availability checks', async () => {
+    const { classifyFileIntent } = await import('../services/orchestrator.js');
+    expect(classifyFileIntent('请最终输出一个 docx 文档')).toBe('generation');
+    expect(classifyFileIntent('需要生成图文并茂的 PDF 文件')).toBe('generation');
+    expect(classifyFileIntent('我不要文本，直接给我文件')).toBe('generation');
+  });
+
+  it('recognizes genuine file availability questions', async () => {
+    const { classifyFileIntent } = await import('../services/orchestrator.js');
+    expect(classifyFileIntent('docx 文件生成了吗？')).toBe('availability');
+    expect(classifyFileIntent('附件在哪里下载？')).toBe('availability');
+    expect(classifyFileIntent('where is the deliverable file?')).toBe('availability');
+  });
+
+  it('ignores unrelated conversation', async () => {
+    const { classifyFileIntent } = await import('../services/orchestrator.js');
+    expect(classifyFileIntent('把活动时间调整为两个小时')).toBe('none');
   });
 });

@@ -9,6 +9,18 @@ import { CostTracker } from '../utils/cost-tracker.js';
 import fs from 'fs/promises';
 import path from 'path';
 
+const FILE_TARGET_PATTERN = /文件|文档|附件|交付物|下载|链接|docx|pdf|xlsx|pptx|file|document|attachment|deliverable/i;
+const FILE_AVAILABILITY_PATTERN = /(?:文件|文档|附件|交付物|docx|pdf|xlsx|pptx).*(?:在哪|哪里|有吗|存在吗|生成了吗|生成了没|做好了吗|完成了吗|导出了吗|能下载吗|下载链接)|(?:在哪|哪里|下载链接).*(?:文件|文档|附件|交付物)|(?:where|download|link|available|ready|exist).*(?:file|document|attachment|deliverable)|(?:file|document|attachment|deliverable).*(?:where|download|link|available|ready|exist)/i;
+const FILE_GENERATION_PATTERN = /生成|创建|制作|输出|导出|写成|整理成|转换成|转成|保存为|给我|需要|最终|generate|create|produce|export|write|make|convert|save as/i;
+
+export function classifyFileIntent(message: string): 'availability' | 'generation' | 'none' {
+  const normalized = message.trim();
+  if (!FILE_TARGET_PATTERN.test(normalized)) return 'none';
+  if (FILE_AVAILABILITY_PATTERN.test(normalized)) return 'availability';
+  if (FILE_GENERATION_PATTERN.test(normalized)) return 'generation';
+  return 'none';
+}
+
 class Orchestrator {
   private activeRuns = new Map<string, AbortController>();
   private costTrackers = new Map<string, CostTracker>();
@@ -132,6 +144,7 @@ class Orchestrator {
 
     // Pre-load executor modules once (not inside the while loop)
     const { executeSubtask } = await import('./executor-claude.js');
+    const { executeClaudeCodeSubtask } = await import('./executor-claude-code.js');
     const { executeCodexSubtask, CodexTimeoutError, CodexNotFoundError } = await import('./executor-codex.js');
     const { selectExecutor, withRetry, isRetryableError } = await import('../utils/retry.js');
 
@@ -218,6 +231,11 @@ class Orchestrator {
               if (actualExecutor === 'codex') {
                 try {
                   const wsDir = (session as any).workspaceDir as string | undefined;
+                  const imagePaths = attachmentStore
+                    .getBySession(sessionId)
+                    .filter((attachment) => attachment.type === 'image' && attachment.status === 'ready')
+                    .map((attachment) => attachmentStore.getLocalPath(attachment))
+                    .filter((imagePath): imagePath is string => Boolean(imagePath));
                   const codexResult = await executeCodexSubtask(st, signal, (chunk: string) => {
                     sessionStore.appendSubtaskProgress(sessionId, st.id, chunk);
                     sseManager.broadcast(sessionId, {
@@ -225,11 +243,14 @@ class Orchestrator {
                       subtaskId: st.id,
                       chunk,
                     });
-                  }, wsDir);
+                  }, wsDir, imagePaths);
                   result = codexResult.text;
                   inputTokens = codexResult.inputTokens;
                   outputTokens = codexResult.outputTokens;
                 } catch (codexErr) {
+                  if (st.kind === 'vision' || st.kind === 'image_generation') {
+                    throw codexErr;
+                  }
                   // ANY Codex error → fall back to Claude API
                   // (Codex may be unavailable due to network, auth, or missing executable)
                   logger.warn(
@@ -251,14 +272,24 @@ class Orchestrator {
                     return { result, inputTokens, outputTokens };
                 }
               } else {
-                const claudeResult = await executeSubtask(st, results, signal, (chunk: string) => {
+                const wsDir = (session as any).workspaceDir as string | undefined;
+                const claudeResult = st.kind === 'code'
+                  ? await executeClaudeCodeSubtask(st, signal, (chunk: string) => {
+                    sessionStore.appendSubtaskProgress(sessionId, st.id, chunk);
+                    sseManager.broadcast(sessionId, {
+                      type: 'subtask:progress',
+                      subtaskId: st.id,
+                      chunk,
+                    });
+                  }, wsDir)
+                  : await executeSubtask(st, results, signal, (chunk: string) => {
                   sessionStore.appendSubtaskProgress(sessionId, st.id, chunk);
                   sseManager.broadcast(sessionId, {
                     type: 'subtask:progress',
                     subtaskId: st.id,
                     chunk,
                   });
-                });
+                  });
                 result = claudeResult.text;
                 inputTokens = claudeResult.inputTokens;
                 outputTokens = claudeResult.outputTokens;
@@ -561,11 +592,7 @@ class Orchestrator {
   }
 
   private isFileAvailabilityQuestion(message: string): boolean {
-    const normalized = message.toLowerCase();
-    return [
-      '文件', '文档', '附件', '下载', '导出', '输出', '交付', '生成了没', '生成了吗', '在哪',
-      'file', 'document', 'attachment', 'download', 'output', 'deliverable', 'link', 'where',
-    ].some((keyword) => normalized.includes(keyword));
+    return classifyFileIntent(message) === 'availability';
   }
 
   private buildAttachmentReply(sessionId: string): string {

@@ -1,13 +1,42 @@
+# Dependencies
 node_modules/
+**/node_modules/
+
+# Build and compiler output
 dist/
-data/
-!.gitkeep
-.env
-*.log
-web/dist/
-server/dist/
+**/dist/
 *.tsbuildinfo
-.ccb/
+.vite/
+
+# Runtime data and user uploads
+data/
+server/data/
 server/uploads/*
 !server/uploads/.gitkeep
+
+# Secrets and machine-local environment overrides
+.env
+.env.*
+!.env.example
+
+# Logs, test reports, coverage and temporary files
+*.log
+coverage/
+test-results/
+playwright-report/
+tmp/
+temp/
+*.tmp
+*.temp
+
+# Local agent/runtime state
+.agents/
+.ccb/
 .claude/
+
+# Editor and operating-system files
+.idea/
+.vscode/
+.DS_Store
+Thumbs.db
+Desktop.ini

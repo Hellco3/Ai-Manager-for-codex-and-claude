@@ -19,7 +19,7 @@
     "test:e2e": "npx playwright test -c tests/e2e/playwright.config.ts"
   },
   "devDependencies": {
-    "@playwright/test": "^1.55.0",
+    "@playwright/test": "^1.61.1",
     "@types/multer": "^2.2.0",
     "concurrently": "^9.1.0",
     "typescript": "^5.7.0"

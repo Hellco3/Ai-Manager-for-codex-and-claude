@@ -4,6 +4,7 @@ import { config } from '../config.js';
 import { logger } from '../utils/logger.js';
 
 const SYSTEM_PROMPTS: Record<string, string> = {
+  code: `You are an expert software engineer. Implement the requested code directly in the specified workspace when tools are available. Produce complete, maintainable code, run relevant verification, and report exact files changed. Prefer Simplified Chinese for explanations unless the task requires another language.`,
   analysis: `You are an expert analyst. Analyze the given task thoroughly and provide clear, actionable insights. Be structured and concise. Prefer Simplified Chinese in your response unless the task clearly requires another language.`,
   design: `You are an expert software architect. Design solutions that are practical, scalable, and well-documented. Include diagrams in text (ASCII or Mermaid). Prefer Simplified Chinese in your response unless the task clearly requires another language.`,
   research: `You are an expert researcher. Investigate the given topic and provide comprehensive findings with references and actionable recommendations. Prefer Simplified Chinese in your response unless the task clearly requires another language.`,
@@ -18,7 +19,7 @@ export interface ClaudeExecutionResult {
 }
 
 /**
- * Execute an analysis/design/research/integration subtask via Claude API.
+ * Execute a code/analysis/design/research/integration subtask via Claude API.
  * Uses CCSwitch proxy at ANTHROPIC_BASE_URL — same as Claude Code.
  */
 export async function executeSubtask(

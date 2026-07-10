@@ -40,6 +40,30 @@ describe('PipelineStore', () => {
     expect(usePipelineStore.getState().subtasks.t1.result).toBe('done');
   });
 
+  it('preserves the executor kind from a live subtask event', () => {
+    usePipelineStore.getState().applySSEEvent({
+      type: 'subtask:started',
+      subtaskId: 'research-1',
+      kind: 'research',
+      description: 'research task',
+      timestamp: 1000,
+    });
+
+    expect(usePipelineStore.getState().subtasks['research-1'].subtask.kind).toBe('research');
+    expect(usePipelineStore.getState().statusMessage).toContain('research task');
+  });
+
+  it('keeps visible processing feedback during execute and aggregate stages', () => {
+    const store = usePipelineStore.getState();
+    store.applySSEEvent({ type: 'stage:started', stage: 'execute', timestamp: 2000 });
+    expect(usePipelineStore.getState().statusMessage).toBe('正在执行子任务...');
+    expect(usePipelineStore.getState().statusStartedAt).toBeTruthy();
+
+    store.applySSEEvent({ type: 'stage:started', stage: 'aggregate', timestamp: 3000 });
+    expect(usePipelineStore.getState().statusMessage).toBe('正在汇总结果...');
+    expect(usePipelineStore.getState().statusProgress).toBe(80);
+  });
+
   it('resets correctly', () => {
     usePipelineStore.getState().reset();
     expect(usePipelineStore.getState().decomposition).toBeNull();

@@ -36,6 +36,8 @@ const KIND_LABELS: Record<string, string> = {
   research: 'research',
   design: 'design',
   code: 'code',
+  vision: 'vision',
+  image_generation: 'image generation',
   integration: 'integration',
 };
 
@@ -79,8 +81,8 @@ function mapStatus(status: string): LaneStatus {
 }
 
 function getLane(kind: string | undefined, index: number): LaneId {
-  if (kind === 'analysis' || kind === 'research' || kind === 'design' || kind === 'integration') return 'claude';
-  if (kind === 'code') return 'codex';
+  if (kind === 'code' || kind === 'analysis' || kind === 'research' || kind === 'design' || kind === 'integration') return 'claude';
+  if (kind === 'vision' || kind === 'image_generation') return 'codex';
   // Default: alternate between lanes
   return index % 2 === 0 ? 'claude' : 'codex';
 }
@@ -306,8 +308,8 @@ export default function SwimLaneView({ subtasks, currentStage }: SwimLaneViewPro
                       <div className={`text-sm font-semibold ${laneMeta.accent}`}>{laneMeta.label}</div>
                       <div className="mt-1 text-[11px] uppercase tracking-[0.22em] text-slate-500">
                         {laneId === 'claude'
-                          ? (isZh ? '推理 / 研究 / 集成' : 'reasoning / research / integration')
-                          : (isZh ? '构建 / 代码' : 'build / code')}
+                          ? (isZh ? '代码 / 推理 / 研究 / 集成' : 'code / reasoning / research / integration')
+                          : (isZh ? '读图 / 生图' : 'vision / image generation')}
                       </div>
                     </div>
                   </div>
