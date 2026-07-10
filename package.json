@@ -1,5 +1,5 @@
 {
-  "name": "ai_manager",
+  "name": "conductor",
   "private": true,
   "workspaces": [
     "shared",
