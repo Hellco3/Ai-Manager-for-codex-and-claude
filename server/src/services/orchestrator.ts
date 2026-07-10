@@ -6,6 +6,8 @@ import { decomposeTask } from './decomposer.js';
 import { config } from '../config.js';
 import { logger } from '../utils/logger.js';
 import { CostTracker } from '../utils/cost-tracker.js';
+import fs from 'fs/promises';
+import path from 'path';
 
 class Orchestrator {
   private activeRuns = new Map<string, AbortController>();
@@ -45,8 +47,8 @@ class Orchestrator {
       // Stage 3: Aggregate
       await this.runAggregateStage(sessionId, costTracker);
 
-      // Complete
       this.completeSession(sessionId, costTracker);
+      await this.publishCompletionReport(sessionId, costTracker);
     } catch (error: any) {
       if (error.name === 'AbortError') return;
       logger.error({ sessionId, error }, 'Orchestrator pipeline failed');
@@ -77,6 +79,7 @@ class Orchestrator {
       await this.runExecuteStage(sessionId, costTracker, abortController.signal);
       await this.runAggregateStage(sessionId, costTracker);
       this.completeSession(sessionId, costTracker);
+      await this.publishCompletionReport(sessionId, costTracker);
     } catch (error: any) {
       if (error.name === 'AbortError') return;
       logger.error({ sessionId, error }, 'Resume pipeline failed');
@@ -387,6 +390,9 @@ class Orchestrator {
       costBreakdown,
     };
 
+    // Persist aggregated result so it survives page reload
+    sessionStore.setAggregatedResult(sessionId, result);
+
     sseManager.broadcast(sessionId, {
       type: 'session:complete',
       result,
@@ -399,6 +405,182 @@ class Orchestrator {
     sessionStore.updateStatus(sessionId, 'completed');
     logger.info({ sessionId, totalCost: costTracker.getTotalCost() }, 'Session completed');
     this.activeRuns.delete(sessionId);
+  }
+
+  private formatDuration(durationMs: number): string {
+    const seconds = Math.floor(durationMs / 1000);
+    return seconds < 60 ? `${seconds}s` : `${Math.floor(seconds / 60)}m ${seconds % 60}s`;
+  }
+
+  private async collectWorkspaceArtifacts(sessionId: string): Promise<FileAttachment[]> {
+    const session = sessionStore.get(sessionId);
+    const workspaceDir = (session as any)?.workspaceDir as string | undefined;
+    if (!session || !workspaceDir) return [];
+
+    const resolvedRoot = path.resolve(workspaceDir);
+    const createdAfter = Math.max(0, session.createdAt - 15000);
+    const allowedExts = new Set([
+      '.docx', '.doc', '.pdf', '.md', '.txt', '.csv', '.json',
+      '.xlsx', '.xls', '.pptx', '.ppt', '.png', '.jpg', '.jpeg', '.webp', '.svg', '.zip',
+    ]);
+    const candidates: Array<{ filePath: string; mtimeMs: number; size: number }> = [];
+
+    const walk = async (dir: string, depth: number): Promise<void> => {
+      if (depth > 4) return;
+      let entries: Awaited<ReturnType<typeof fs.readdir>>;
+      try {
+        entries = await fs.readdir(dir, { withFileTypes: true });
+      } catch {
+        return;
+      }
+
+      for (const entry of entries) {
+        const fullPath = path.join(dir, entry.name);
+        if (!fullPath.startsWith(resolvedRoot)) continue;
+
+        if (entry.isDirectory()) {
+          if (['node_modules', '.git', 'dist', 'build', '.next'].includes(entry.name)) continue;
+          await walk(fullPath, depth + 1);
+          continue;
+        }
+
+        if (!entry.isFile()) continue;
+        if (!allowedExts.has(path.extname(entry.name).toLowerCase())) continue;
+
+        try {
+          const stat = await fs.stat(fullPath);
+          if (stat.mtimeMs < createdAfter || stat.size <= 0) continue;
+          candidates.push({ filePath: fullPath, mtimeMs: stat.mtimeMs, size: stat.size });
+        } catch {
+          continue;
+        }
+      }
+    };
+
+    await walk(resolvedRoot, 0);
+
+    const imported: FileAttachment[] = [];
+    for (const candidate of candidates.sort((a, b) => b.mtimeMs - a.mtimeMs).slice(0, 20)) {
+      try {
+        const attachment = await attachmentStore.importFile(sessionId, candidate.filePath);
+        imported.push(attachment);
+        sseManager.broadcast(sessionId, { type: 'attachment:updated', attachment });
+      } catch (error) {
+        logger.warn({ sessionId, filePath: candidate.filePath, error }, 'Failed to import workspace artifact');
+      }
+    }
+
+    return imported;
+  }
+
+  private buildCompletionReport(
+    sessionId: string,
+    costTracker: CostTracker,
+    artifacts: FileAttachment[],
+  ): { content: string; attachmentIds?: string[]; messageType: 'completion' } {
+    const session = sessionStore.get(sessionId)!;
+    const states = Object.values(session.subtaskStates ?? {});
+    const completed = states.filter((state) => state.status === 'completed');
+    const failed = states.filter((state) => state.status === 'failed' || state.status === 'timed_out');
+
+    const lines: string[] = [
+      '任务执行完成。',
+      '',
+      `✅ 成功子任务：${completed.length} 个`,
+      failed.length > 0 ? `❌ 失败子任务：${failed.length} 个` : `失败子任务：0 个`,
+      `⏱ 总耗时：${this.formatDuration(costTracker.getTotalDuration())}`,
+      `💰 预估费用：$${costTracker.getTotalCost().toFixed(4)}`,
+    ];
+
+    if (artifacts.length > 0) {
+      lines.push('', `📦 已生成 ${artifacts.length} 个交付文件（详情见下方文件卡片）`);
+    }
+
+    const highlights = completed
+      .slice(0, 3)
+      .map((state) => {
+        const snippet = (state.result ?? '').replace(/\s+/g, ' ').trim().slice(0, 140);
+        return `- ${state.subtask.description}${snippet ? `：${snippet}${snippet.length >= 140 ? '…' : ''}` : ''}`;
+      });
+
+    if (highlights.length > 0) {
+      lines.push('', '本次产出要点：', ...highlights);
+    }
+
+    if (failed.length > 0) {
+      lines.push('', '未完成项：');
+      for (const state of failed.slice(0, 3)) {
+        lines.push(`- ${state.subtask.description}：${state.error ?? '执行失败'}`);
+      }
+    }
+
+    if (artifacts.length === 0) {
+      lines.push('', '未检测到可直接下载的交付文件。');
+    }
+
+    return {
+      content: lines.join('\n'),
+      attachmentIds: artifacts.length > 0 ? artifacts.map((artifact) => artifact.id) : undefined,
+      messageType: 'completion',
+    };
+  }
+
+  private async publishCompletionReport(sessionId: string, costTracker: CostTracker): Promise<void> {
+    const artifacts = await this.collectWorkspaceArtifacts(sessionId);
+    const report = this.buildCompletionReport(sessionId, costTracker, artifacts);
+    sessionStore.addMessage(sessionId, 'assistant', report.content, report.attachmentIds, report.messageType);
+    sseManager.broadcast(sessionId, {
+      type: 'message:complete',
+      content: report.content,
+      role: 'assistant',
+      timestamp: Date.now(),
+      attachmentIds: report.attachmentIds,
+      messageType: report.messageType,
+    });
+  }
+
+  private buildAttachmentContext(sessionId: string): string {
+    const attachments = attachmentStore
+      .getBySession(sessionId)
+      .filter((attachment) => attachment.status === 'ready');
+
+    if (attachments.length === 0) {
+      return '当前会话没有任何可下载附件。若用户询问文件、文档、下载入口、图片或交付物，必须明确告知现在还没有可用附件，不能猜测它已经生成。';
+    }
+
+    const lines = attachments.map((attachment) => (
+      `- ${attachment.originalName} | ${attachment.mimeType} | /api/uploads/${attachment.storageKey}`
+    ));
+
+    return [
+      '当前会话可下载附件如下。只有这些文件可以被描述为“已经生成”或“可以下载”：',
+      ...lines,
+      '如果用户询问某个文件是否存在，必须只根据这份清单回答；不要虚构不存在的文件名、链接或下载入口。',
+    ].join('\n');
+  }
+
+  private isFileAvailabilityQuestion(message: string): boolean {
+    const normalized = message.toLowerCase();
+    return [
+      '文件', '文档', '附件', '下载', '导出', '输出', '交付', '生成了没', '生成了吗', '在哪',
+      'file', 'document', 'attachment', 'download', 'output', 'deliverable', 'link', 'where',
+    ].some((keyword) => normalized.includes(keyword));
+  }
+
+  private buildAttachmentReply(sessionId: string): string {
+    const attachments = attachmentStore
+      .getBySession(sessionId)
+      .filter((attachment) => attachment.status === 'ready');
+
+    if (attachments.length === 0) {
+      return '我刚核对了当前会话，暂时没有可下载的附件或交付文件，所以现在不能说文件已经生成。请继续检查执行器是否真的把文件写到了工作区，或重新执行一次生成步骤。';
+    }
+
+    const fileList = attachments
+      .map((attachment) => `- ${attachment.originalName}`)
+      .join('\n');
+
+    return `我刚核对了当前会话，确实有这些可下载文件：\n${fileList}\n\n你可以直接在这条或上一条助手消息的附件区域打开它们。`;
   }
 
   cancelSession(sessionId: string): void {
@@ -489,6 +671,7 @@ class Orchestrator {
       await this.runExecuteStage(sessionId, costTracker, abortController.signal);
       await this.runAggregateStage(sessionId, costTracker);
       this.completeSession(sessionId, costTracker);
+      await this.publishCompletionReport(sessionId, costTracker);
     } catch (error: any) {
       if (error.name === 'AbortError') return;
       logger.error({ sessionId, error }, 'Continue session failed');
@@ -520,6 +703,18 @@ class Orchestrator {
         apiKey: config.ANTHROPIC_API_KEY,
         baseURL: config.ANTHROPIC_BASE_URL,
       });
+
+      if (this.isFileAvailabilityQuestion(userMessage)) {
+        const directReply = this.buildAttachmentReply(sessionId);
+        sseManager.broadcast(sessionId, {
+          type: 'message:complete',
+          content: directReply,
+          role: 'assistant',
+          timestamp: Date.now(),
+        });
+        sessionStore.addMessage(sessionId, 'assistant', directReply);
+        return;
+      }
 
       // Build conversation context
       const historyMessages = (session.messages ?? [])
@@ -868,38 +1063,8 @@ class Orchestrator {
       });
       await this.runAggregateStage(sessionId, costTracker);
 
-      // Phase 4: Generate completion report in chat
-      const session2 = sessionStore.get(sessionId)!;
-      const completedCount = Object.values(session2.subtaskStates!).filter(s => s.status === 'completed').length;
-      const failedCount = Object.values(session2.subtaskStates!).filter(s => s.status === 'failed' || s.status === 'timed_out').length;
-      const totalCost = costTracker.getTotalCost();
-      const totalDuration = costTracker.getTotalDuration();
-      const durationSec = Math.floor(totalDuration / 1000);
-      const durationStr = durationSec < 60 ? `${durationSec}s` : `${Math.floor(durationSec / 60)}m ${durationSec % 60}s`;
-
-      const reportSummary = `✅ 任务执行完成！\
-\n\n📊 **执行汇总**：\
-\n- 成功：${completedCount} 个子任务\
-\n- 失败：${failedCount} 个子任务\
-\n- 总耗时：${durationStr}\
-\n- 预估费用：$${totalCost.toFixed(4)}\
-\n\n有什么需要调整的吗？告诉我你的想法，我会重新规划并执行。`;
-
-      sessionStore.addMessage(sessionId, 'assistant', reportSummary);
-      // Stream it as a message for the chat UI
-      for (let i = 0; i < reportSummary.length; i += 5) {
-        const chunk = reportSummary.slice(i, i + 5);
-        sseManager.broadcast(sessionId, { type: 'message:chunk', chunk });
-        await new Promise(r => setTimeout(r, 10)); // simulate streaming
-      }
-      sseManager.broadcast(sessionId, {
-        type: 'message:complete',
-        content: reportSummary,
-        role: 'assistant',
-        timestamp: Date.now(),
-      });
-
       this.completeSession(sessionId, costTracker);
+      await this.publishCompletionReport(sessionId, costTracker);
     } catch (error: any) {
       if (error.name === 'AbortError') return;
       logger.error({ sessionId, error }, 'Confirm and decompose failed');

@@ -20,7 +20,7 @@ export default function App() {
   }, []);
 
   return (
-    <div className="min-h-screen bg-grid flex flex-col">
+    <div className="flex h-screen flex-col overflow-hidden bg-grid">
       <header className="border-b border-slate-700/50 bg-slate-900/50 backdrop-blur-sm shrink-0">
         <div className="px-4 sm:px-6 py-4 flex items-center justify-between flex-wrap gap-3">
           <div className="flex items-center gap-3">
@@ -40,9 +40,9 @@ export default function App() {
       </header>
 
       {/* Main Content — full viewport height */}
-      <main className="flex flex-1 min-h-0">
+      <main className="flex min-h-0 flex-1 overflow-hidden">
         <SessionSidebar collapsed={sidebarCollapsed} onToggle={toggleSidebar} />
-        <div className="flex-1 min-w-0 overflow-hidden">
+        <div className="min-w-0 flex-1 overflow-hidden">
           <Routes>
             <Route path="/" element={<ChatFirst />} />
             <Route path="/task/:sessionId" element={<TaskProgress />} />

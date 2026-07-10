@@ -53,6 +53,16 @@ export default function SessionSidebar({ collapsed, onToggle }: Props) {
     return () => clearInterval(t);
   }, [fetchSessions]);
 
+  useEffect(() => {
+    if (!currentSessionId) return;
+    fetchSessions();
+  }, [currentSessionId, fetchSessions]);
+
+  useEffect(() => {
+    if (!mobileOpen) return;
+    fetchSessions();
+  }, [mobileOpen, fetchSessions]);
+
   // Restore last session on mount if no active session
   useEffect(() => {
     if (!currentSessionId && lastSessionId) {
@@ -88,6 +98,7 @@ export default function SessionSidebar({ collapsed, onToggle }: Props) {
     reset();
     navigate('/');
     setMobileOpen(false);
+    fetchSessions();
   };
 
   const activeId = currentSessionId || lastSessionId;

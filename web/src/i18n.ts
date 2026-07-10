@@ -132,6 +132,18 @@ const zh = {
     dropHere: '释放以上传文件',
     retry: '重试',
   },
+  completion: {
+    title: '任务执行完成',
+    succeeded: '成功',
+    failed: '失败',
+    subtasks: '个子任务',
+    keyResults: '关键产出',
+    downloadFiles: '交付文件',
+    noFiles: '未生成可下载文件',
+    viewInPanel: '在右侧执行面板查看详情',
+    cost: '费用',
+    duration: '耗时',
+  },
 };
 
 const en: typeof zh = {
@@ -267,6 +279,18 @@ const en: typeof zh = {
     addFile: 'Add file',
     dropHere: 'Drop to upload',
     retry: 'Retry',
+  },
+  completion: {
+    title: 'Task Completed',
+    succeeded: 'succeeded',
+    failed: 'failed',
+    subtasks: 'subtasks',
+    keyResults: 'Key Results',
+    downloadFiles: 'Deliverables',
+    noFiles: 'No downloadable files generated',
+    viewInPanel: 'View details in execution panel',
+    cost: 'Cost',
+    duration: 'Duration',
   },
 };
 

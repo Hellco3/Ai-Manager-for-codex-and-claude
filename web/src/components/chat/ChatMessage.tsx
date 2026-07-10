@@ -2,7 +2,9 @@ import React, { useMemo } from 'react';
 import { motion, useReducedMotion } from 'framer-motion';
 import { t } from '../../i18n.js';
 import FilePreview from './FilePreview.jsx';
+import CompletionCard from './CompletionCard.jsx';
 import type { FileAttachment } from '../../api/upload.js';
+import type { SubtaskState, AggregatedResult } from '@ai_manager/shared';
 import { usePipelineStore } from '../../store/pipeline-store.js';
 
 interface ChatMessageProps {
@@ -11,6 +13,7 @@ interface ChatMessageProps {
   timestamp: number;
   isStreaming?: boolean;
   attachmentIds?: string[];
+  messageType?: 'text' | 'completion';
 }
 
 function formatTime(ts: number): string {
@@ -20,7 +23,8 @@ function formatTime(ts: number): string {
   return new Date(ts).toLocaleTimeString();
 }
 
-const FILE_PATH_RE = /((?:[A-Za-z]:[\\/][^\s<>"]+?\.\w{1,8})|(?:\/[^\s<>"]+?\.\w{1,8})|(?:\.?[\\/][^\s<>"]+?\.\w{1,8}))/g;
+const URL_RE = /((?:https?:\/\/|\/api\/uploads\/)[^\s<>"')\]]+)/g;
+const FILE_PATH_RE = /((?:[A-Za-z]:[\\/][^\s<>"]+?\.\w{1,8})|(?:\/(?!api\/uploads\/)[^\s<>"]+?\.\w{1,8})|(?:\.?[\\/][^\s<>"]+?\.\w{1,8}))/g;
 
 function renderContent(text: string, isUser: boolean) {
   const contentClassName = 'whitespace-pre-wrap break-words [overflow-wrap:anywhere]';
@@ -29,30 +33,60 @@ function renderContent(text: string, isUser: boolean) {
   }
 
   const parts: React.ReactNode[] = [];
-  let lastIndex = 0;
-  let match: RegExpExecArray | null;
-  const re = new RegExp(FILE_PATH_RE.source, 'g');
+  const matches = [
+    ...Array.from(text.matchAll(new RegExp(URL_RE.source, 'g'))).map((match) => ({
+      index: match.index ?? 0,
+      value: match[1],
+      kind: 'url' as const,
+    })),
+    ...Array.from(text.matchAll(new RegExp(FILE_PATH_RE.source, 'g'))).map((match) => ({
+      index: match.index ?? 0,
+      value: match[1],
+      kind: 'file' as const,
+    })),
+  ].sort((a, b) => a.index - b.index);
 
-  while ((match = re.exec(text)) !== null) {
-    const path = match[1];
+  let lastIndex = 0;
+  for (const match of matches) {
+    if (match.index < lastIndex) continue;
+
     if (match.index > lastIndex) {
       parts.push(text.slice(lastIndex, match.index));
     }
 
-    const fileUrl = `file:///${path.replace(/\\/g, '/').replace(/^([A-Za-z]):\//, '$1:/')}`;
-    parts.push(
-      <a
-        key={match.index}
-        href={fileUrl}
-        className="text-purple-400 underline underline-offset-2 transition-colors hover:text-purple-300"
-        target="_blank"
-        rel="noopener noreferrer"
-        title={path}
-      >
-        File: {path.split(/[\\/]/).pop() || path}
-      </a>,
-    );
-    lastIndex = match.index + path.length;
+    if (match.kind === 'url') {
+      const href = match.value.startsWith('/api/uploads/') ? match.value : match.value;
+      parts.push(
+        <a
+          key={`${match.kind}-${match.index}`}
+          href={href}
+          className="text-purple-400 underline underline-offset-2 transition-colors hover:text-purple-300"
+          target="_blank"
+          rel="noopener noreferrer"
+          title={match.value}
+        >
+          {match.value.startsWith('/api/uploads/')
+            ? `下载文件: ${decodeURIComponent(match.value.split('/').pop() || match.value)}`
+            : match.value}
+        </a>,
+      );
+    } else {
+      const fileUrl = `file:///${match.value.replace(/\\/g, '/').replace(/^([A-Za-z]):\//, '$1:/')}`;
+      parts.push(
+        <a
+          key={`${match.kind}-${match.index}`}
+          href={fileUrl}
+          className="text-purple-400 underline underline-offset-2 transition-colors hover:text-purple-300"
+          target="_blank"
+          rel="noopener noreferrer"
+          title={match.value}
+        >
+          File: {match.value.split(/[\\/]/).pop() || match.value}
+        </a>,
+      );
+    }
+
+    lastIndex = match.index + match.value.length;
   }
 
   if (lastIndex < text.length) {
@@ -62,12 +96,14 @@ function renderContent(text: string, isUser: boolean) {
   return <div className={contentClassName}>{parts.length > 0 ? parts : text}</div>;
 }
 
-export default function ChatMessage({ role, content, timestamp, isStreaming, attachmentIds }: ChatMessageProps) {
+export default function ChatMessage({ role, content, timestamp, isStreaming, attachmentIds, messageType }: ChatMessageProps) {
   const reduceMotion = useReducedMotion();
   const isUser = role === 'user';
   const isSystem = role === 'system';
   const isAssistant = role === 'assistant';
   const attachmentsById = usePipelineStore((s) => s.attachmentsById);
+  const aggregatedResult = usePipelineStore((s) => s.aggregatedResult);
+  const subtaskStates = usePipelineStore((s) => s.subtasks);
 
   const attachments: FileAttachment[] = attachmentIds
     ? attachmentIds
@@ -96,6 +132,30 @@ export default function ChatMessage({ role, content, timestamp, isStreaming, att
       <motion.div initial={initial} animate={animate} className="flex justify-center px-4 py-2">
         <div className="max-w-[80%] rounded-full border border-slate-700/50 bg-slate-900/65 px-3 py-1 text-center text-xs italic text-slate-500">
           {renderContent(content, false)}
+        </div>
+      </motion.div>
+    );
+  }
+
+  // Completion card rendering
+  if (messageType === 'completion' && isAssistant && aggregatedResult) {
+    const attachmentRecords: FileAttachment[] = attachmentIds
+      ? attachmentIds
+        .map((id) => attachmentsById[id])
+        .filter((a): a is FileAttachment => a != null)
+      : [];
+
+    return (
+      <motion.div initial={initial} animate={animate} className="flex justify-center px-3 py-2 md:px-5">
+        <div className="w-full max-w-[88%] md:max-w-[80%]">
+          <CompletionCard
+            aggregatedResult={aggregatedResult}
+            subtaskStates={subtaskStates as Record<string, SubtaskState>}
+            attachments={attachmentRecords}
+          />
+          <div className="mt-1.5 text-center text-[10px] text-slate-500">
+            {t.chat.assistant} | {formatTime(timestamp)}
+          </div>
         </div>
       </motion.div>
     );

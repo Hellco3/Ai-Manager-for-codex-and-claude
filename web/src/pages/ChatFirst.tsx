@@ -246,7 +246,7 @@ export default function ChatFirst() {
   const showPanelLabel = isZh ? '展开面板' : 'Show Panel';
 
   const renderExecutionPanel = () => (
-    <div className="panel-surface flex h-full flex-col">
+    <div className="panel-surface flex h-full min-h-0 flex-col overflow-hidden">
       <div className="flex items-center justify-between border-b border-slate-700/60 px-4 py-4">
         <div>
           <div className="panel-badge">{executionLabel}</div>
@@ -264,7 +264,7 @@ export default function ChatFirst() {
         </button>
       </div>
 
-      <div className="chat-scroll flex-1 space-y-4 overflow-y-auto px-4 py-4">
+      <div className="chat-scroll flex-1 min-h-0 space-y-4 overflow-y-auto px-4 py-4">
         {showConfirm && (
           <div className="subtle-panel-strong rounded-2xl border p-4">
             <p className="text-sm font-medium text-slate-100">{t.chatFirst.startTask}</p>
@@ -386,7 +386,7 @@ export default function ChatFirst() {
   );
 
   return (
-    <div className="flex h-full flex-col">
+    <div className="flex h-full min-h-0 flex-col overflow-hidden">
       {/* Processing indicator */}
       {statusMessage && (
         <div className="mb-1 flex items-center gap-2 px-4 pt-3">
@@ -408,7 +408,7 @@ export default function ChatFirst() {
         </div>
       )}
       {/* Top bar — compact */}
-      <div className="flex items-center justify-between gap-3 px-4 py-2.5 border-b border-slate-700/30">
+      <div className="flex shrink-0 items-center justify-between gap-3 px-4 py-2.5 border-b border-slate-700/30">
         <div className="flex items-center gap-2 min-w-0">
           <div className="text-[10px] uppercase tracking-[0.12em] text-slate-500 shrink-0">{t.chatFirst.taskLabel}</div>
           <div className="text-xs text-slate-400 truncate">{workspaceDir ?? t.workspace.default}</div>
@@ -438,24 +438,24 @@ export default function ChatFirst() {
 
       {/* Grid: right panel width adapts — 344px idle, 420px decomposition, 520px execution */}
       <div
-        className={`grid gap-4 min-h-0 flex-1 transition-[grid-template-columns] duration-500 ease-out ${
+        className={`grid min-h-0 flex-1 gap-4 overflow-hidden transition-[grid-template-columns] duration-500 ease-out ${
           isPanelOpen
             ? hasPipelineStarted
-              ? 'md:grid-cols-[minmax(0,1fr)_520px]'
+              ? 'md:grid-cols-[minmax(0,1fr)_minmax(460px,560px)]'
               : showDecomposition && decomposition
-                ? 'md:grid-cols-[minmax(0,1fr)_420px]'
-                : 'md:grid-cols-[minmax(0,1fr)_344px]'
+                ? 'md:grid-cols-[minmax(0,1fr)_minmax(420px,500px)]'
+                : 'md:grid-cols-[minmax(0,1fr)_360px]'
             : 'md:grid-cols-[minmax(0,1fr)_48px]'
         }`}
       >
-        <div className="chat-shell stage-card flex h-full flex-col overflow-hidden p-0">
+        <div className="chat-shell stage-card flex h-full min-h-0 flex-col overflow-hidden p-0">
           <WorkspaceSelector
             workspaceDir={workspaceDir}
             onUpdate={handleUpdateWorkspace}
             disabled={isSending || hasPipelineStarted}
           />
 
-          <div ref={containerRef} className="chat-scroll flex-1 overflow-y-auto px-4 py-3">
+          <div ref={containerRef} className="chat-scroll flex-1 min-h-0 overflow-y-auto px-4 py-3">
             {messages.length === 0 && !isStreaming && (
               <div className="flex justify-center px-5 py-10">
                 <div className="empty-state-card max-w-md rounded-[32px] border p-8 text-center">
@@ -476,6 +476,7 @@ export default function ChatFirst() {
                 content={msg.content}
                 timestamp={msg.timestamp}
                 attachmentIds={msg.attachmentIds}
+                messageType={(msg as any).messageType}
               />
             ))}
 
@@ -516,17 +517,17 @@ export default function ChatFirst() {
         </div>
 
         {isPanelOpen && (
-          <aside className="subtle-panel hidden overflow-hidden rounded-[24px] border md:block h-full">
+          <aside className="subtle-panel hidden h-full min-h-0 overflow-hidden rounded-[24px] border md:block">
             {renderExecutionPanel()}
           </aside>
         )}
 
         {!isPanelOpen && (
-          <aside className="hidden md:flex h-full">
+          <aside className="hidden h-full min-h-0 md:flex">
             <button
               type="button"
               onClick={() => setIsPanelOpen(true)}
-              className="panel-surface flex h-full min-h-[560px] w-12 items-center justify-center rounded-[24px] border text-slate-300 transition-colors hover:text-slate-100"
+              className="panel-surface flex h-full w-12 items-center justify-center rounded-[24px] border text-slate-300 transition-colors hover:text-slate-100"
               aria-label={showPanelLabel}
             >
               <span className="[writing-mode:vertical-rl] text-[11px] uppercase tracking-[0.24em]">{executionLabel}</span>

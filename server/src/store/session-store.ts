@@ -9,6 +9,7 @@ import {
   type Subtask,
   type CostStats,
   type FileAttachment,
+  type AggregatedResult,
 } from '@ai_manager/shared';
 import { logger } from '../utils/logger.js';
 import { attachmentStore } from './attachment-store.js';
@@ -20,7 +21,8 @@ interface StoredSession {
   mode: 'auto' | 'semi-auto';
   decomposition: any;
   subtaskStates: Record<string, SubtaskState>;
-  messages?: Array<{ role: string; content: string; timestamp: number; attachmentIds?: string[] }>;
+  messages?: Array<{ role: string; content: string; timestamp: number; attachmentIds?: string[]; messageType?: 'text' | 'completion' }>;
+  aggregatedResult?: AggregatedResult;
   costStats: CostStats[];
   createdAt: number;
   updatedAt: number;
@@ -31,6 +33,7 @@ export class SessionStore {
   private persistPath: string | null;
   private dirty = false;
   private flushTimer: ReturnType<typeof setInterval> | null = null;
+  private flushSoonTimer: ReturnType<typeof setTimeout> | null = null;
 
   constructor(persistPath?: string) {
     this.persistPath = persistPath ?? null;
@@ -83,6 +86,12 @@ export class SessionStore {
 
   private markDirty(): void {
     this.dirty = true;
+    if (!this.persistPath) return;
+    if (this.flushSoonTimer) clearTimeout(this.flushSoonTimer);
+    this.flushSoonTimer = setTimeout(() => {
+      this.flushSoonTimer = null;
+      this.flushToDisk().catch(() => {});
+    }, 1000);
   }
 
   private async cleanupExpired(): Promise<void> {
@@ -266,7 +275,7 @@ export class SessionStore {
     return session;
   }
 
-  addMessage(sessionId: string, role: string, content: string, attachmentIds?: string[]): SessionState | undefined {
+  addMessage(sessionId: string, role: string, content: string, attachmentIds?: string[], messageType?: 'text' | 'completion'): SessionState | undefined {
     const session = this.sessions.get(sessionId);
     if (!session) return undefined;
     if (!session.messages) session.messages = [];
@@ -275,7 +284,17 @@ export class SessionStore {
       message.attachmentIds = attachmentIds;
       attachmentStore.bindToMessage(attachmentIds, `${sessionId}:${session.messages.length}`);
     }
+    if (messageType) message.messageType = messageType;
     session.messages.push(message);
+    session.updatedAt = Date.now();
+    this.markDirty();
+    return session;
+  }
+
+  setAggregatedResult(sessionId: string, result: AggregatedResult): SessionState | undefined {
+    const session = this.sessions.get(sessionId);
+    if (!session) return undefined;
+    (session as any).aggregatedResult = result;
     session.updatedAt = Date.now();
     this.markDirty();
     return session;
@@ -302,6 +321,10 @@ export class SessionStore {
 
   async shutdown(): Promise<void> {
     if (this.flushTimer) clearInterval(this.flushTimer);
+    if (this.flushSoonTimer) {
+      clearTimeout(this.flushSoonTimer);
+      this.flushSoonTimer = null;
+    }
     await this.flushToDisk();
   }
 }

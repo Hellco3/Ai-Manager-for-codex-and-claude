@@ -79,8 +79,8 @@ function mapStatus(status: string): LaneStatus {
 }
 
 function getLane(kind: string | undefined, index: number): LaneId {
-  if (kind === 'analysis' || kind === 'research' || kind === 'design') return 'claude';
-  if (kind === 'code' || kind === 'integration') return 'codex';
+  if (kind === 'analysis' || kind === 'research' || kind === 'design' || kind === 'integration') return 'claude';
+  if (kind === 'code') return 'codex';
   // Default: alternate between lanes
   return index % 2 === 0 ? 'claude' : 'codex';
 }
@@ -181,9 +181,13 @@ function LaneCard({ state, index }: LaneCardProps) {
       <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_top_left,rgba(56,189,248,0.14),transparent_38%),radial-gradient(circle_at_bottom_right,rgba(16,185,129,0.12),transparent_34%)] opacity-60" />
       <div className="pointer-events-none absolute inset-y-0 left-0 w-px bg-gradient-to-b from-transparent via-slate-500/50 to-transparent" />
 
-      <div className="relative flex items-start justify-between gap-4">
-        <div className="min-w-0 flex-1">
-          <div className="mb-2 flex items-center gap-2">
+      <div className="relative space-y-3">
+        <div className="flex flex-wrap items-center gap-2">
+          <span className={`inline-flex items-center gap-2 rounded-full border px-3 py-1 text-[11px] font-medium uppercase tracking-[0.24em] ${meta.badge}`}>
+            <StatusGlyph status={status} />
+            <span>{meta.label}</span>
+          </span>
+          <div className="flex min-w-0 flex-wrap items-center gap-2">
             <span className="rounded-full border border-slate-700/70 bg-slate-950/80 px-2 py-0.5 font-mono text-[10px] uppercase tracking-[0.24em] text-slate-400">
               {state.subtask.id}
             </span>
@@ -191,34 +195,29 @@ function LaneCard({ state, index }: LaneCardProps) {
               {KIND_LABELS[state.subtask.kind] ?? state.subtask.kind}
             </span>
           </div>
-
-          <div className="text-sm font-medium leading-6 text-slate-100">
-            {state.subtask.description}
-          </div>
-
-          <div className="mt-3 flex flex-wrap items-center gap-2 text-[11px] text-slate-400">
-            <span className="rounded-full border border-slate-800 bg-slate-950/80 px-2 py-1">
-              P{state.subtask.priority}
-            </span>
-            <span className="rounded-full border border-slate-800 bg-slate-950/80 px-2 py-1 uppercase">
-              {state.subtask.estimatedComplexity}
-            </span>
-            {state.subtask.dependencies.length > 0 && (
-              <span className="rounded-full border border-slate-800 bg-slate-950/80 px-2 py-1">
-                deps {state.subtask.dependencies.length}
-              </span>
-            )}
-            {duration && (
-              <span className="rounded-full border border-slate-800 bg-slate-950/80 px-2 py-1 font-mono text-slate-300">
-                {duration}
-              </span>
-            )}
-          </div>
         </div>
 
-        <div className={`inline-flex items-center gap-2 rounded-full border px-3 py-1 text-[11px] font-medium uppercase tracking-[0.24em] ${meta.badge}`}>
-          <StatusGlyph status={status} />
-          <span>{meta.label}</span>
+        <div className="text-sm font-medium leading-6 text-slate-100 break-words [overflow-wrap:anywhere]">
+          {state.subtask.description}
+        </div>
+
+        <div className="flex flex-wrap items-center gap-2 text-[11px] text-slate-400">
+          <span className="rounded-full border border-slate-800 bg-slate-950/80 px-2 py-1">
+            P{state.subtask.priority}
+          </span>
+          <span className="rounded-full border border-slate-800 bg-slate-950/80 px-2 py-1 uppercase">
+            {state.subtask.estimatedComplexity}
+          </span>
+          {state.subtask.dependencies.length > 0 && (
+            <span className="rounded-full border border-slate-800 bg-slate-950/80 px-2 py-1">
+              deps {state.subtask.dependencies.length}
+            </span>
+          )}
+          {duration && (
+            <span className="rounded-full border border-slate-800 bg-slate-950/80 px-2 py-1 font-mono text-slate-300">
+              {duration}
+            </span>
+          )}
         </div>
       </div>
 
@@ -298,18 +297,17 @@ export default function SwimLaneView({ subtasks, currentStage }: SwimLaneViewPro
               className={`relative overflow-hidden rounded-[24px] border border-slate-800/90 bg-slate-900/80 ${laneMeta.glow}`}
             >
               <div className="absolute inset-0 bg-[linear-gradient(90deg,rgba(15,23,42,0.96),rgba(2,6,23,0.84))]" />
-              <div className="absolute inset-y-0 left-[190px] hidden w-px bg-gradient-to-b from-transparent via-slate-700 to-transparent md:block" />
 
-              <div className="relative flex flex-col md:flex-row">
-                <div className="border-b border-slate-800/80 p-4 md:w-[190px] md:border-b-0 md:border-r md:border-slate-800/80 md:p-5">
+              <div className="relative flex flex-col xl:flex-row">
+                <div className="border-b border-slate-800/80 p-4 xl:w-[184px] xl:shrink-0 xl:border-b-0 xl:border-r xl:border-slate-800/80 xl:p-5">
                   <div className="flex items-center gap-3">
                     <div className={`h-3 w-3 rounded-full ${laneId === 'claude' ? 'bg-cyan-300 shadow-[0_0_16px_rgba(103,232,249,0.9)]' : 'bg-blue-300 shadow-[0_0_16px_rgba(147,197,253,0.9)]'}`} />
                     <div>
                       <div className={`text-sm font-semibold ${laneMeta.accent}`}>{laneMeta.label}</div>
                       <div className="mt-1 text-[11px] uppercase tracking-[0.22em] text-slate-500">
                         {laneId === 'claude'
-                          ? (isZh ? '推理 / 研究' : 'reasoning / research')
-                          : (isZh ? '构建 / 集成' : 'build / integration')}
+                          ? (isZh ? '推理 / 研究 / 集成' : 'reasoning / research / integration')
+                          : (isZh ? '构建 / 代码' : 'build / code')}
                       </div>
                     </div>
                   </div>
@@ -336,9 +334,9 @@ export default function SwimLaneView({ subtasks, currentStage }: SwimLaneViewPro
                   </div>
                 </div>
 
-                <div className="flex-1 p-4 sm:p-5">
+                <div className="min-w-0 flex-1 p-4 sm:p-5">
                   <AnimatePresence mode="popLayout">
-                    <div className="grid gap-3">
+                    <div className="grid min-w-0 gap-3">
                       {laneItems.length > 0 ? (
                         laneItems.map((item, index) => (
                           <LaneCard key={item.subtask.id} state={item} index={index} />

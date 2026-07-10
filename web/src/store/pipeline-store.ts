@@ -1,5 +1,6 @@
 import { create } from 'zustand';
 import type {
+  AggregatedResult,
   CostStats,
   SessionState,
   SSEEvent,
@@ -33,6 +34,7 @@ interface PipelineStore {
   isComplete: boolean;
   isError: boolean;
   errorMessage: string | null;
+  aggregatedResult: AggregatedResult | null;
 
   // Chat state
   messages: ChatMessage[];
@@ -211,6 +213,7 @@ export const usePipelineStore = create<PipelineStore>((set, get) => ({
   isComplete: false,
   isError: false,
   errorMessage: null,
+  aggregatedResult: null,
 
   // Chat state
   messages: [],
@@ -235,6 +238,7 @@ export const usePipelineStore = create<PipelineStore>((set, get) => ({
     isComplete: false,
     isError: false,
     errorMessage: null,
+    aggregatedResult: null,
     messages: [],
     isStreaming: false,
     streamingContent: '',
@@ -258,6 +262,7 @@ export const usePipelineStore = create<PipelineStore>((set, get) => ({
       totalDurationMs: session.costStats.reduce((sum: number, stat: any) => sum + stat.durationMs, 0),
       isComplete: session.status === 'completed',
       isError: session.status === 'failed' || session.status === 'cancelled' || session.status === 'timed_out',
+      aggregatedResult: (session as any).aggregatedResult ?? null,
       errorMessage: session.status === 'cancelled'
         ? 'Task cancelled by user'
         : session.status === 'timed_out'
@@ -457,6 +462,7 @@ export const usePipelineStore = create<PipelineStore>((set, get) => ({
           isComplete: true,
           isError: false,
           errorMessage: null,
+          aggregatedResult: event.result,
           statusMessage: null,
           statusStep: null,
           statusProgress: 100,
@@ -520,16 +526,18 @@ export const usePipelineStore = create<PipelineStore>((set, get) => ({
           if (lastMsg && lastMsg.role === msgEvent.role && lastMsg.content === msgEvent.content) {
             return { isStreaming: false, streamingContent: '' };
           }
+          const newMsg: any = {
+            role: msgEvent.role,
+            content: msgEvent.content,
+            timestamp: msgEvent.timestamp,
+            id: msgEvent.id,
+            attachmentIds: msgEvent.attachmentIds,
+          };
+          if (msgEvent.messageType) newMsg.messageType = msgEvent.messageType;
           return {
             isStreaming: false,
             streamingContent: '',
-            messages: [...s.messages, {
-              role: msgEvent.role,
-              content: msgEvent.content,
-              timestamp: msgEvent.timestamp,
-              id: msgEvent.id,
-              attachmentIds: msgEvent.attachmentIds,
-            }],
+            messages: [...s.messages, newMsg],
           };
         });
         break;
@@ -569,6 +577,7 @@ export const usePipelineStore = create<PipelineStore>((set, get) => ({
     isComplete: false,
     isError: false,
     errorMessage: null,
+    aggregatedResult: null,
     messages: [],
     isStreaming: false,
     streamingContent: '',

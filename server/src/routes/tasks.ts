@@ -93,6 +93,7 @@ router.get('/tasks/:id', (req: Request, res: Response) => {
       attachmentStore.getBySession(id).map((attachment) => [attachment.id, attachment]),
     ),
     workspaceDir: (session as any).workspaceDir ?? null,
+    aggregatedResult: (session as any).aggregatedResult ?? null,
     costStats: session.costStats,
     createdAt: session.createdAt,
     updatedAt: session.updatedAt,

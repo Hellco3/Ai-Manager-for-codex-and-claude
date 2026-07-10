@@ -1,6 +1,9 @@
 import { z } from 'zod';
 import { Subtask, SubtaskState, TaskDecomposition, CostStats, AggregatedResult, FileAttachment } from './task.js';
 
+const MessageType = z.enum(['text', 'completion']);
+export type MessageType = z.infer<typeof MessageType>;
+
 // --- SSE Event Types ---
 export const SSEEventType = z.enum([
   'session:created',
@@ -40,7 +43,7 @@ export const SSEEvent = z.discriminatedUnion('type', [
   z.object({ id: z.string().optional(), type: z.literal('session:error'), error: z.string() }),
   z.object({ id: z.string().optional(), type: z.literal('cost:update'), stats: CostStats }),
   z.object({ id: z.string().optional(), type: z.literal('message:chunk'), chunk: z.string() }),
-  z.object({ id: z.string().optional(), type: z.literal('message:complete'), content: z.string(), role: z.string(), timestamp: z.number(), attachmentIds: z.array(z.string()).optional() }),
+  z.object({ id: z.string().optional(), type: z.literal('message:complete'), content: z.string(), role: z.string(), timestamp: z.number(), attachmentIds: z.array(z.string()).optional(), messageType: MessageType.optional() }),
   z.object({ id: z.string().optional(), type: z.literal('attachment:updated'), attachment: FileAttachment }),
   z.object({ id: z.string().optional(), type: z.literal('status:progress'), message: z.string(), step: z.string(), progress: z.number().optional() }),
   z.object({ id: z.string().optional(), type: z.literal('heartbeat'), timestamp: z.number() }),
@@ -76,9 +79,11 @@ export const SessionState = z.object({
     content: z.string(),
     timestamp: z.number(),
     attachmentIds: z.array(z.string()).optional(),
+    messageType: MessageType.optional(),
   })).optional(),
   attachments: z.record(z.string(), FileAttachment).optional(),
   workspaceDir: z.string().optional(),
+  aggregatedResult: AggregatedResult.optional(),
   costStats: z.array(CostStats).default([]),
   createdAt: z.number(),
   updatedAt: z.number(),
